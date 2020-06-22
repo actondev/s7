@@ -79,11 +79,14 @@ sources = files(
   )
 
 # essentially i'm just copying the file
-conf_data = configuration_data()
+# conf_data = configuration_data()
+# configure_file(input : 'mus-config.h.in',
+#                output : 'mus-config.h',
+#                configuration : conf_data)
+
 configure_file(input : 'mus-config.h.in',
                output : 'mus-config.h',
-               configuration : conf_data)
-
+               copy: true)
 
 link_args = []
 
