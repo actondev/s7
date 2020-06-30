@@ -160,6 +160,7 @@
 	"GtkWindowType" "GtkPopoverMenuFlags"
 	"GtkPadController*" "GtkStyleContext*" "GtkGesture*" "GtkIconInfo*"
 	"GdkKeymapKey*" "GtkShortcutActionFlags"
+	"GdkMonitor*"
 	))
 
 (define no-xen-p 
@@ -675,6 +676,13 @@
 	(cons "GtkShortcutTriggerMatch" "INT")
 	(cons "GdkKeyMatch" "INT")
 	(cons "GtkSystemSetting" "INT")
+
+	(cons "GtkOrdering" "INT")
+	(cons "GtkFilterMatch" "INT")
+	(cons "GtkFilterChange" "INT")
+	(cons "GtkStringFilterMatchMode" "INT")
+	(cons "GtkSorterOrder" "INT")
+	(cons "GtkSorterChange" "INT")
 	))
 
 (define (c-to-xen-macro-name type str)
