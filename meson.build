@@ -28,7 +28,7 @@ s7 = library('s7',
   sources,
   include_directories : includes,
   c_args : [],
-  # link_args : link_args,
+  link_args : link_args,
 	    )
 s7_dep = declare_dependency(
   link_with : s7,
