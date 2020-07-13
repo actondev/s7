@@ -45,6 +45,11 @@
 		      -moz-border-radius: 20px;
 		      -webkit-border-radius: 20px;
 		      }
+        DIV.small {font-size: small;
+	              padding-left: 0.5cm; 
+	              padding-right: 0.5cm; 
+		      padding-bottom: 0.5cm;
+                  }		      
         DIV.header {margin-top: 60px;
 	            margin-bottom: 30px;
 	            border: 4px solid #00ff00; /* green */
@@ -222,6 +227,7 @@ indented and on a sort of brownish background.
            <li><a href="#libgdbm">libgdbm</a>
       </ul>
       <li><a href="#schemerepl">repl.scm</a>
+      <li><a href="#case">case.scm</a>
       <li><a href="#debug">debug.scm</a>
       <li><a href="#lint">lint.scm</a>
   </ul>
@@ -2156,7 +2162,7 @@ vector-dimensions returns a list of the dimensions.
 
 <pre class="indented">
 (define (make-array dims . inits)
-  (subvector (apply vector (flatten inits)) dims))
+  (subvector (apply vector (flatten inits)) 0 (apply * dims) dims))
 
 &gt; (make-array '(3 3) '(1 1 1) '(2 2 2) '(3 3 3))
 <em class="gray">#2d((1 1 1) (2 2 2) (3 3 3))</em>
@@ -2191,7 +2197,7 @@ s7_ints, s7_doubles, or unsigned bytes.
 (<em class=def id="stringtobytevector">string-&gt;byte-vector</em> str)
 (<em class=def id="bytevectortostring">byte-vector-&gt;string</em> str)
 
-(<em class=def id="subvector">subvector</em> vector dimensions position)
+(<em class=def id="subvector">subvector</em> vector start end dimensions)
 (<em class=def id="subvectorp">subvector?</em> obj) 
 (<em class=def id="subvectorvector">subvector-vector</em> obj) 
 (<em class=def id="subvectorposition">subvector-position</em> obj)
@@ -2229,25 +2235,41 @@ error handlers need this name).
 </pre>
 
 <p>To access a vector's elements with different dimensions than the original had, use 
-<code>(subvector original-vector new-dimensions (position 0))</code>:
+<code>(subvector original-vector 0 (length original-vector) new-dimensions)</code>:
 </p>
 
 <pre class="indented">
 &gt; (let ((v1 #2d((1 2 3) (4 5 6)))) 
-    (let ((v2 (subvector v1 '(6)))) ; flatten the original
+    (let ((v2 (subvector v1))) ; flatten the original (1D is the default)
       v2))
 <em class="gray">#(1 2 3 4 5 6)</em>
 &gt; (let ((v1 #(1 2 3 4 5 6))) 
-    (let ((v2 (subvector v1 '(3 2)))) 
+    (let ((v2 (subvector v1 0 6 '(3 2)))) 
       v2))
 <em class="gray">#2d((1 2) (3 4) (5 6))</em>
 </pre>
 <p>A subvector is a window onto some other vector's data.  The data is not copied, just accessed differently.
-The <code>new-dimensions</code> parameter can be either an integer or a list.  In the integer case, it sets
-the length of the subvector, otherwise the dimensions of the subvector.  <code>subvector-vector</code> returns
-the underlying vector, and <code>subvector-position</code> returns the starting point of the subvector
+The new-dimensions parameter is a list giving the lengths of the dimensions.  The start and
+end parameters refer to positions in the original vector.
+subvector-vector returns
+the underlying vector, and subvector-position returns the starting point of the subvector
 in the underlying data.
 </p>
+
+<div class="small">
+<p>subvector's parameter list changed 8-Jul-2020. It was <code>(subvector vect new-length-or-dimension-list start)</code>,
+but that conflicts with substring, and is confusing (the start position follows the length).  To translate from
+the old subvector to the new:
+</p>
+<pre class="indented">
+(define (old-subvector vect len (offset 0))
+  (if (pair? len)
+      (subvector vect offset (+ offset (apply * len)) len)
+      (if (not len)
+          (subvector vect offset (length vect))
+          (subvector vect offset (+ offset len)))))
+</pre>
+</div>
 <blockquote>
 
 <div class="indented">
@@ -2455,14 +2477,14 @@ This also affects format and sort!:
 </p>
 
 <pre class="indented">
-&gt;(subvector (list-&gt;vector '(1 2 3 4)) '(2 2))
+&gt;(subvector (list-&gt;vector '(1 2 3 4)) 0 4 '(2 2))
 <em class="gray">#2d((1 2) (3 4))</em>
 &gt; (let ((a #2d((1 2) (3 4)))
         (b #2d((5 6) (7 8))))
-  (list (subvector (append a b) '(2 4))
-	(subvector (append a b) '(4 2))
-	(subvector (append (a 0) (b 0) (a 1) (b 1)) '(2 4))
-	(subvector (append (a 0) (b 0) (a 1) (b 1)) '(4 2))))
+  (list (subvector (append a b) 0 8 '(2 4))
+	(subvector (append a b) 0 8 '(4 2))
+	(subvector (append (a 0) (b 0) (a 1) (b 1)) 0 8 '(2 4))
+	(subvector (append (a 0) (b 0) (a 1) (b 1)) 0 8 '(4 2))))
 <em class="gray">(#2d((1 2 3 4) (5 6 7 8)) 
  #2d((1 2) (3 4) (5 6) (7 8)) 
  #2d((1 2 5 6) (3 4 7 8)) 
@@ -5394,13 +5416,6 @@ is simply returned, unevaluated.
 <em class="gray">abcd</em>
 </pre>
 
-<p>Since the expansion evaluates its body at read-time, if the body includes code that 
-is evaluated at read-time (preceding the usual quasiquoted list), the arguments to the expansion need to "make sense".
-So, if a macro calls an expansion, and passes its own arguments (after quasiquotation)
-to that expansion, the expansion probably won't do what you expect.  One way to defer
-the expansion to run-time is to use (,'expansion ...) rather than (expansion ...).
-</p>
-
 <p>The main built-in expansion is <b><em class=def id="readercond">reader-cond</em></b>.  The syntax is based on cond:
 the car of each clause is evaluated (in the read-time context), and if it is not false,
 the remainder of that clause is spliced into the code as if you had typed it from the start.
@@ -5487,7 +5502,6 @@ accept-all-keyword-arguments  #f
 autoloading?                  #t
 openlets                      #t, whether any let can be open globally (this overrides all openlets)
 
-;; the rest are not settable
 cpu-time                      run time so far
 file-names                    currently loaded files (a list)
 catches                       a list of the currently active catch tags
@@ -5503,7 +5517,7 @@ rootlet-size                  the number of globals
 heap-size                     total cells currently available
 max-heap-size                 maximum heap size
 free-heap-size                the number of currently unused cells
-gc-stats                      #f (#t turns on printout of the GC activity)
+gc-stats                      0 (or #f), 1: show GC activity, 2: heap, 4: stack, #t = 1
 gc-freed                      number of cells freed by the last GC pass
 gc-total-freed                number of cells freed so far by the GC; the total allocated is probably close to
                                 (with-let *s7* (+ (- heap-size free-heap-size) gc-total-freed))
@@ -6329,6 +6343,8 @@ Currently, you can't set! a built-in syntactic keyword to some new value:
 let-temporarily uses set!, so <code>(let-temporarily ((if 3))...)</code>
 is also unlikely to work.
 </p>
+</div>
+
 
 <p>Speaking of speed... It is widely believed
 that a Scheme with first class everything can't hope to compete with any
@@ -6357,8 +6373,7 @@ Similarly, s7 computes (fib 40) in 0.8 seconds, approximately the same as sbcl.
 Guile 2.2.3 takes 7 seconds.
 </p>
 
-<div class="separator"></div>
-<small>
+<div class="small">
 <p>
 s7's timing tests are in its tools directory.  The script
 valcall.scm runs them through callgrind.  The results
@@ -6445,9 +6460,7 @@ bench s7 all
 integers can be compared with eq? (via assq), which is incorrect.
 pi.scm and chudnovsky.scm need the gmp version of s7.
 </p>
-</small>
 </div>
-
 
 
 
@@ -6674,6 +6687,7 @@ customized indefinitely.  See, for example, inf-snd.el in the Snd package.
 (put 'letrec* 'scheme-indent-function 1)
 (put 'sublet 'scheme-indent-function 1)
 (put 'varlet 'scheme-indent-function 1)
+(put 'case* 'scheme-indent-function 1)
 </pre>
 
 <p>To read stdin while working in a GUI-based program is trickier.  In glib/gtk, you can use
@@ -10102,22 +10116,32 @@ functions are explained <a href="#beginhook">above</a>.
 <br><br>
 
 
-<!-- -------------------------------------------------------------------------------- -->
+
 <div class="topheader" id="s7examples">s7 examples</div>
 
-<p>The s7 tarball includes several scheme files including s7test.scm,
-lint.scm, cload.scm, write.scm, mockery.scm, and stuff.scm.  
-s7test.scm is a regression test for s7, 
-lint.scm is the s7 equivalent of the ancient C program named lint (modern equivalent: cppcheck), 
-write.scm has a pretty printer, 
-mockery.scm has mock data libraries,
-cload.scm is a wrapper for the FFI stuff described above, and 
-stuff.scm is just some arbitrary stuff.  
+<p>The s7 tarball includes several scheme files:
+</p>
+<ul>
+  <li>case.scm provides case*, an extension of case for pattern matching
+  <li>cload.scm is a wrapper for the FFI stuff described above
+  <li>coretemp.scm is a gtk example 
+  <li>debug.scm provides various debugging aids such as trace, break, and watch
+  <li>json.scm is a JSON reader/writer, but I got side-tracked
+  <li>lint.scm is the s7 equivalent of the ancient C program named lint (modern equivalent: cppcheck)
+  <li>loop.scm is Rick Taube's CL loop macro
+  <li>mockery.scm has mock data libraries (openlets masquerading as various data types)
+  <li>profile.scm is a profiler
+  <li>r7rs.scm implements some of r7rs-small
+  <li>reactive.scm implements some reactive programming macros (set!, let)
+  <li>repl.scm is a vt-100 based repl
+  <li>s7test.scm is a regression test for s7
+  <li>stuff.scm is just some arbitrary stuff
+  <li>write.scm has a pretty printer
+</ul>
+<p>
+libc.scm, libgsl.scm, libm.scm, libdl.scm, libutf8proc.scm, and libgdbm.scm tie the associated
+libraries into s7.
 gdbinit has some gdb commands for s7. 
-reactive.scm implements some reactive programming macros (set!, let).
-repl.scm is a repl.
-profile.scm is the profiler.
-debug.scm provides various debugging aids such as trace, break, and watch.
 </p>
 
 
@@ -10343,6 +10367,22 @@ the only sane response is: "forget it! I'll do it in C".
 	res))))
 
 ;; now (load "*.scm") is (for-each load (glob-&gt;list "*.scm")) 
+
+;; a couple regular expression examples
+(with-let (sublet *libc*)
+  (define rg (regex.make))
+  (regcomp rg "a.b" 0)
+  (display (regexec rg "acb" 0 0)) (newline) ; 0 = match
+  (regfree rg))
+
+(with-let (sublet *libc*)
+  (define rg (regex.make))
+  (let ((res (regcomp rg "colou\\?r" 0)))
+    (if (not (zero? res))
+	(error 'regex-error "~S: ~S~%" "colou\\?r" (regerror res rg)))
+    (set! res (regexec rg "The color green" 1 0))
+    (display res) (newline)                ; #i(4 9) = match start/end
+    (regfree rg)))
 </pre>
 </div>
 
@@ -10617,6 +10657,81 @@ not tested:
 (load "/home/bil/test/libxm/libxm.so" (inlet 'init_func 'Init_libxm))
 
 -->
+
+<div class="header" id="case"><h4>case.scm</h4></div>
+
+<p>case.scm has case*, a compatible extension of case that includes pattern matching.
+<code>(case* selector ((target...) body) ...)</code> uses equivalent? to match the
+selector to the targets, evaluating the body associated with the first matching target.
+If a target is a list or vector, the elements are checked item by item.
+Each target, or element of a list or vector can be a pattern.  Patterns
+are of the form #&lt;whatever&gt; (undefined constants from s7's pointer of view).
+A pattern can be:
+</p>
+<pre>
+<ul>
+<li>#&lt;&gt;               any expr matches
+<li>#&lt;func&gt;           expr matches if (func expr)
+<li>#&lt;label:func&gt;     expr matches as above, expr is saved under "label"
+<li>#&lt;label:&gt;         any expr matches, and is saved under "label"
+<li>#&lt;label&gt;          expr must match the value saved under "label"
+<li>#&lt;...&gt;            skip exprs covered by the ellipsis
+<li>#&lt;label:...&gt;      skip as above, saved skipped exprs under "label" as a quoted list.
+<li>                  a pattern can have any number of labelled ellipses overall, 
+<li>                  but just one unnamed ellipsis, and only one ellipsis per pair or vector
+<li>#&lt;label,func:...&gt; a labelled ellipsis which matches if (func expr); expr is the ellipsis list,
+<li>                  label is not optional in this case
+<li>#&lt;"regexp"&gt;       pattern is a regular expression to be matched against a string
+<li>#&lt;label:"regexp"&gt; a labelled regular expression
+</ul>
+</pre>
+
+<p>If a label occurs in the result body, the expression it labelled is substituted for it.
+</p>
+
+<pre class="indented">
+(case* x ((3.14) 'pi))                ; returns 'pi if x is 3.14
+
+(case* x ((#&lt;symbol?&gt;)))              ; returns #t if x is a symbol
+
+(case* x (((+ 1 #&lt;symbol?&gt;))))        ; matches any list of the form '(+ 1 x) or any symbol in place of "x"
+
+(case* x (((#&lt;symbol?&gt; #&lt;e1:...&gt; (+ #&lt;e2:...&gt;)))
+          (append #&lt;e1&gt; #&lt;e2&gt;)))      ;  passed '(a b c d (+ 1 2)), returns '(b c d 1 2)
+
+(case* x ((#&lt;"a.b"&gt;)))                ; matches if x is a string "a.b" where "." matches anything
+
+(define (palindrome? x)
+  (case* x
+    ((() (#&lt;&gt;)) 
+     #t)
+    (((#&lt;start:&gt; #&lt;middle:...&gt; #&lt;start&gt;)) 
+     (palindrome? #&lt;middle&gt;))
+    (else #f)))
+</pre>
+
+<p>case*'s matching function can be used anywhere.
+</p>
+
+<pre class="indented">
+(let ((match? ((funclet 'case*) 'case*-match?))) ; this is case*'s matcher
+  (match? x '(+ #&lt;symbol?&gt; 1)))                  ; returns #t if x is of the form '(+ x 1), x any symbol
+
+(define match+
+  (let* ((match? ((funclet 'case*) 'case*-match?))
+	 (labels ((funclet 'case*) 'case*-labels))) ; these are the labels and their values
+    (macro (arg)
+      (cond ((null? arg) ())
+	    ((match? arg '(+ #&lt;a:&gt; (+ #&lt;b:...&gt;))) `(+ ,(labels 'a) ,@(cadr (labels 'b))))
+	    ((match? arg '(+ #&lt;&gt; #&lt;&gt;)) `(+ ,@(cdr arg)))
+	    (else #f)))))
+
+  ;; (match+ (+ 1 (+ 2 3))) -&gt; 6
+</pre>
+
+<p>See case.scm and s7test.scm for many more examples.
+</p>
+
 
 <div class="header" id="debug"><h4>debug.scm</h4></div>
 

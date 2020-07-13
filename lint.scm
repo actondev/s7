@@ -2418,7 +2418,7 @@
       (case x
 	((char?) '(eqv? char=?))
 	((integer? rational? real? number? complex? float? infinite? nan?) '(eqv? =))
-	((symbol? keyword? boolean? not null? procedure? syntax? macro? undefined? unspecified?) '(eq? eq?))
+	((symbol? keyword? boolean? not null? procedure? syntax? macro? unspecified?) '(eq? eq?))
 	((string?) '(equal? string=?))
 	((pair? vector? float-vector? int-vector?  subvector? hash-table?) '(equal? equal?))
 	((eof-object?) '(eq? eof-object?))
@@ -7759,9 +7759,13 @@
 
 		      ((not (pair? target)))
 		      
-		      ((and (not (eq? head 'string-set!)) ; (vector-set! (vector-ref x 0) 1 2) -- vector within vector
-			    (memq (car target) '(vector-ref list-ref hash-table-ref let-ref float-vector-ref int-vector-ref)))
+		      ((and (not (memq head '(string-set! hash-table-set! let-set!))) ; (vector-set! (vector-ref x 0) 1 2) -- vector within vector
+			    (memq (car target) '(vector-ref list-ref float-vector-ref int-vector-ref)))
 		       (lint-format "perhaps ~A" caller (lists->string form `(set! (,@(cdr target) ,index) ,val))))
+		      
+		      ((and (not (eq? head 'string-set!)) ; (hash-table-set! (vector-ref x 0) 'a 2) -> (set! ((x 0) 'a) 2)
+			    (memq (car target) '(vector-ref list-ref)))
+		       (lint-format "perhaps ~A" caller (lists->string form `(set! ((,@(cdr target)) ,index) ,val))))
 		      
 		      ((memq (car target) '(make-vector vector make-string string make-list list append cons 
 					    vector-append inlet sublet copy vector-copy string-copy list-copy
@@ -7787,22 +7791,24 @@
 	  (define (sp-subvector caller head form env)
 	    (when (and (pair? (cdr form))
 		       (pair? (cddr form)))
-	      (let ((dims (caddr form))
-		    (offset (and (pair? (cdddr form))
-				 (cadddr form))))
-		(when (pair? dims)
-		  (let ((dl (catch #t
-			      (lambda ()
-				(eval dims))
-			      (lambda args
-				#f))))
-		    (when (and (pair? dl)
-			       (null? (cdr dl)))
-		      (lint-format "perhaps ~A" caller
-				   (lists->string form `(subvector ,(cadr form) ,(car dl) ,@(cdddr form)))))))
-		(when (eqv? offset 0)
-		  (lint-format "perhaps ~A" caller
-			       (lists->string form `(subvector ,(cadr form) ,(caddr form))))))))
+	      (let ((start (caddr form)))
+		(if (null? (cdddr form))
+		    (if (eqv? start 0)                           ; (subvector v 0) -> (subvector v)
+		      (lint-format "perhaps ~A" caller (lists->string form `(subvector ,(cadr form)))))
+		    (let ((end (cadddr form)))
+		      (if (null? (cddddr form))
+			  (if (and (eqv? start 0)
+				   (len=2? end)
+				   (eq? (cadr form) (cadr end))
+				   (memq (car end) '(length vector-length)))
+			      (lint-format "perhaps ~A" caller (lists->string form `(subvector ,(cadr form)))))
+			  (let ((dims (car (cddddr form))))
+			    (if (and (quoted-pair? dims)
+				     (integer? start)
+				     (integer? end)
+				     (null? (cdadr dims))
+				     (eqv? (caadr dims) (- end start)))
+				(lint-format "perhaps ~A" caller (lists->string form `(subvector ,(cadr form) ,start ,end)))))))))))
 		  
 	  (hash-special 'subvector sp-subvector))
 
@@ -9712,13 +9718,13 @@
 					  (pair? (cddr arg1))))
 				 (len>1? (cadr arg1))
 				 (memq (caadr arg1) '(string->list vector->list)))
-			(let ((string-case (eq? (caadr arg1) 'string->list))    ; (cdr (vector->list v)) -> (subvector v (- (length v) 1) 1)
+			(let ((string-case (eq? (caadr arg1) 'string->list))    ; (cdr (vector->list v)) -> (subvector v 1 (length v))
 			      (len-diff (case (car arg1) ((list-tail) (caddr arg1)) (else => cdr-count))))
 			  (lint-format "~A accepts ~A arguments, so perhaps ~A" caller head 
 				       (if string-case 'string 'vector)
 				       (lists->string arg1 (if string-case
 							       (list 'substring (cadadr arg1) len-diff)
-							       `(subvector ,(cadadr arg1) (- (length ,(cadadr arg1)) ,len-diff) ,len-diff)))))))
+							       `(subvector ,(cadadr arg1) ,len-diff (length ,(cadadr arg1)))))))))
 		    (when (and (eq? head 'for-each)
 			       (len>1? (cadr form))            ; (for-each (lambda (x) (+ (abs x) 1)) lst)
 			       (eq? (caadr form) 'lambda)
@@ -18407,14 +18413,17 @@
 								       (values)))
 								 (cadr form)))
 						      ,end))
-					  (val (catch #t 
-						 (lambda () 
-						   ;(format *stderr* "new-end: ~S~%" new-end)
-						   ((lambda args            ; lambda here and below to catch multiple values, if any
-						      (car args))           ; no need to check (pair? args) since in this context (values)->#<unpecified>
-						    (eval new-end (inlet)))) 
-						 (lambda args
-						   :eval-error))))
+					  (val (and (not (tree-set-memq '(read-char read-line read-string read) new-end))
+						    ;; if new-end has (for example) read-char, eval here will hang waiting on *stdin*
+						    ;; TODO: here and below, protect against any attempt at IO
+						    (catch #t 
+						      (lambda () 
+							;(format *stderr* "new-end: ~S, form: ~S~%" new-end form)
+							((lambda args            ; lambda here and below to catch multiple values, if any
+							   (car args))           ; no need to check (pair? args) since in this context (values)->#<unspecified>
+							 (eval new-end (inlet)))) 
+						      (lambda args
+							:eval-error)))))
 				     (if (and val (not (eq? val :eval-error)))
 					 (lint-format "do is a no-op because ~A is true at the start: ~A" caller end form)
 					 (let* ((step-end `(let (,@(map (lambda (stepper)   ; -> (let ((i (+ 0 1))) (= i 0)) as above
@@ -18426,14 +18435,15 @@
 									      (values)))
 									(cadr form)))
 							     ,end))
-						(val (catch #t
-						       (lambda ()
-							 ;(format *stderr* "step-end: ~S, form: ~S~%" step-end form)
-							 ((lambda args 
-							    (car args))
-							  (eval step-end (inlet))))
-						       (lambda args
-							 :eval-error))))
+						(val (and (not (tree-set-memq '(read-char read-line read-string read) step-end))
+							  (catch #t
+							    (lambda ()
+							      ;(format *stderr* "step-end: ~S, form: ~S~%" step-end form)
+							      ((lambda args 
+								 (car args))
+							       (eval step-end (inlet))))
+							    (lambda args
+							      :eval-error)))))
 					   (if (and val (not (eq? val :eval-error)))
 					       (lint-format "do is unnecessary: ~A" caller form))))))
 
@@ -22974,17 +22984,17 @@
 					(if (string=? data "vu8")
 					    (format outport "~NCuse #u in s7, not #vu8~%" lint-left-margin #\space))
 					(string->symbol data))
-				       
+
 				       ((#\>) ; for Chicken, apparently #>...<# encloses in-place C code
 					(do ((last #\#)
-					     (c (read-char) (read-char))) 
+					     (c (read-char) (read-char)))
 					    ((and (char=? last #\<) 
 						  (char=? c #\#)) 
 					     (values))
 					  (if (char=? c #\newline)
 					      (set! (port-line-number) (+ (port-line-number) 1)))
 					  (set! last c)))
-				       
+
 				       ((#\<) ; Chicken also, #<<EOF -> EOF
 					(if (string=? data "<undef>") ; #<undef> chibi et al
 					    #<undefined> 
@@ -23094,6 +23104,7 @@
       
       
 	;; -------- call lint --------
+
 	(let ((vars (lint-file file ())))
 	  (set! lint-left-margin (max lint-left-margin 1))
 
