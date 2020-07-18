@@ -172,6 +172,7 @@
 	   (define (undefined->function undef e)   ; handle the pattern descriptor ("undef") of the form #< whatever >, "e" = caller's curlet
 	     (let* ((str1 (object->string undef))
 		    (str1-end (- (length str1) 1)))
+	       ;(format *stderr* "~S ~S ~S~%" undef str1 str1-end)
 	       (if (not (char=? (str1 str1-end) #\>))
 		   (error 'wrong-type-arg "pattern descriptor does not end in '>': ~S\n" str1))
 	       (let ((str (substring str1 2 str1-end)))
@@ -190,9 +191,6 @@
 				       (lambda (x)
 					 (set! (labels label) x)                  ; #<label:>, set label, accept anything
 					 #t))
-				      
-				      ((string=? func "...")                      ; #<label:...>
-				       (error 'wrong-type-arg "~S makes no sense outside of a sequence\n" func))
 				      
 				      ((char=? (func 0) #\")                      ; labelled regex, #<label:"regexp">
 				       (lambda (x)
@@ -234,17 +232,20 @@
 	       ;(format *stderr* "~S ~S~%" sel pat)
 	       (and (eq? (type-of sel) (type-of pat))
 		    (let ((func-ok #t))
-		      (if (or (pair? pat)                            ; look for ellipsis
-			      (vector? pat))
-			  (let ((pos (if (pair? pat)
-					 (ellipsis-pair-position 0 pat)
-					 (ellipsis-vector-position pat (length pat)))))
-			    (when (and pos
-				       (>= (length sel) (- (length pat) 1))) ; else pat without ellipsis is too long for sel
-			      (let ((new-vars (list (splice-out-ellipsis sel pat pos e))))
-				(set! sel (car new-vars))
-				(set! pat (cadr new-vars))
-				(set! func-ok (caddr new-vars))))))
+
+		      (when (or (pair? pat)                           ; look for ellipsis
+				(vector? pat))
+			(if (pair? (cyclic-sequences pat))
+			    (error 'wrong-type-arg "case* pattern is cyclic: ~S~%" pat))
+			(let ((pos (if (pair? pat)
+				       (ellipsis-pair-position 0 pat)
+				       (ellipsis-vector-position pat (length pat)))))
+			  (when (and pos
+				     (>= (length sel) (- (length pat) 1))) ; else pat without ellipsis is too long for sel
+			    (let ((new-vars (list (splice-out-ellipsis sel pat pos e))))
+			      (set! sel (car new-vars))
+			      (set! pat (cadr new-vars))
+			      (set! func-ok (caddr new-vars))))))
 
 		      (and (= (length sel) (length pat))             ; march through selector and current target matching elements
 			   func-ok
@@ -330,23 +331,15 @@
 			 (return (eval (cons 'begin body) e))
 			 (for-each
 			  (lambda (target)
-			    (cond ((and (undefined? target)              ; #<...>
-					(not (eq? target #<undefined>)))
-				   (if (equal? target #<...>)
-				       (error 'wrong-type-arg "~S makes no sense outside of a sequence\n" target)
-				       (let ((func (undefined->function target e)))
-					 (if (undefined? func)
-					     (error 'unbound-variable "function ~S is not defined\n"
-						    (let ((str (object->string target)))
-						      (substring str 2 (- (length str) 1)))))
-					 (if (not (procedure? func))
-					     (error 'wrong-type-arg "~S is not a function\n" func))
-					 (if (func select)
-					     (handle-body select body return e)))))
-				  ((or (and (sequence? target)
-					    ((handle-sequence target e) select))
-				       (equivalent? target select))
-				   (handle-body select body return e))))
+			    (if (or (equivalent? target select)
+				    (and (undefined? target)              ; #<...>
+					 (not (eq? target #<undefined>))
+					 (let ((func (undefined->function target e)))
+					   (and (procedure? func)
+						(func select))))
+				    (and (sequence? target)
+					 ((handle-sequence target e) select)))
+				(handle-body select body return e)))
 			  targets))))
 		 clauses)))))))
     ;; case*
@@ -646,4 +639,17 @@
 (display (scase35 "+-<>-+")) (newline)
 (display (scase35 "zzzz")) (newline)
 (display (scase35 (string #\a #\"))) (newline)
+
+;;; for other types:
+(define (hlt x)
+  (case* (with-input-from-string (object->string x) read)
+    (((hash-table 'a #<integer?>)) 'hash-table)
+    (((inlet 'a #<integer?>)) 'inlet)
+    (else #f)))
+
+(display (hlt (inlet 'a 1))) (newline)
+(display (hlt (hash-table 'a 1))) (newline)
+
+(append (list 'float-vector) (vector->list #r(1 2 3))): (float-vector 1.0 2.0 3.0)
+
 |#

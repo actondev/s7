@@ -2219,10 +2219,7 @@ error handlers need this name).
 <em class="gray">#(x x x)</em>
 &gt; (vector-set! v 0 123)
 <em class="red">error</em><em class="gray">: vector-set! argument 3, 123, is an integer but should be a symbol?</em>
-&gt; (define (10|12? val) 
-    (and (integer? val) 
-         (or (= val 10) 
-             (= val 12))))
+&gt; (define (10|12? val) (memv val '(10 12)))
 <em class="gray">10|12?</em>
 &gt; (define v1 (make-vector 3 10 10|12?)) ; only allow values 10 or 12 (initially 10)
 <em class="gray">#(10 10 10)</em>
@@ -2715,10 +2712,7 @@ It is a cons of the type functions,
 be symbols and all the values integers.
 </p>
 <pre class="indented">
-&gt; (define (10|12? val) 
-    (and (integer? val) 
-         (or (= val 10) 
-             (= val 12))))
+&gt; (define (10|12? val) (memv val '(10 12)))
 <em class="gray">10|12?</em>
 &gt; (define hash (make-hash-table 8 #f (cons #t 10|12?))) ; any key is ok, but all values must be 10 or 12
 <em class="gray">(hash-table)</em>
@@ -4757,7 +4751,10 @@ the locals themselves immutable:
 </pre>
 <p>Now <code>(vars-immutable! let)</code> makes it an error to set! any of the locals, but you
 can add locals to the let.  To completely petrify the let, <code>(immutable! (vars-immutable! let))</code>.
+To make a function's documentation immutable: <code>(with-let (funclet 'f2) (immutable! '+documentation+))</code>,
+and similarly for other function closure entries.
 </p>
+
 
 <p>define-constant blocks any attempt to set! or shadow the constant (lexically speaking of course),
 so local constants behave as you'd expect:
@@ -5501,6 +5498,7 @@ undefined-constant-warnings   #f
 accept-all-keyword-arguments  #f 
 autoloading?                  #t
 openlets                      #t, whether any let can be open globally (this overrides all openlets)
+expansions?                   #t, whether expansions are handled at read-time 
 
 cpu-time                      run time so far
 file-names                    currently loaded files (a list)
@@ -9093,7 +9091,10 @@ s7_load_path returns this list, and s7_add_to_load_path adds a directory name to
 </p>
 <p>
 s7_autoload adds a symbol to the <a href="#autoload">autoload table</a>.  As a convenience,
-s7_autoload_set_names adds an array of names+files.  snd-xref.c in Snd has more than 5000 such
+s7_autoload_set_names adds an array of names+files.  The array should be sorted alphabetically
+by string<? acting on the symbol names (not the file names), and the size argument is the number
+of symbol names (half the actual array size).
+snd-xref.c in Snd has more than 5000 such
 names:
 </p>
 <pre>
@@ -10729,7 +10730,7 @@ A pattern can be:
   ;; (match+ (+ 1 (+ 2 3))) -&gt; 6
 </pre>
 
-<p>See case.scm and s7test.scm for many more examples.
+<p>See case.scm and s7test.scm for many more examples, including let and hash-table matching.
 </p>
 
 
