@@ -29836,8 +29836,8 @@ EDITS: 2
 		    (let ((maxa (maxamp)))
 		      (scale-channel 0.5)
 		      (set! old-vals (channel->float-vector (- (* (floor *clm-srate*) 50000) 50) 200))
-		      (if (fneq (maxamp) (* 0.5 maxa)) (snd-display "bigger scale: ~A ~A" maxa (maxamp)))))
-		  (set! (samples (* (floor *clm-srate*) 50000) 100) vals)
+		      (if (fneq (maxamp) (* 0.5 maxa)) (snd-display "bigger scale: ~A ~A" maxa (maxamp))))
+		    (set! (samples (* (floor *clm-srate*) 50000) 100) vals))
 		  (if (not (fieql (edit-tree) (list (list 0 0 0 2204999999 0.5 0.0 0.0 0) 
 						    (list 2205000000 1 0 99 1.0 0.0 0.0 0) 
 						    (list 2205000100 0 2205000100 (- big-file-framples 1) 0.5 0.0 0.0 0) 
@@ -41954,7 +41954,6 @@ EDITS: 1
 			  (vector (lambda () (envelope-interp 1.0 '(0 0 .5)))
 				  (lambda () (help-dialog (list 0 1) "hiho"))
 				  (lambda () (info-dialog (list 0 1) "hiho"))
-				  (lambda () (make-variable-graph #f))
 				  (lambda () (normalize-partials ()))
 				  (lambda () (normalize-partials 32))
 				  (lambda () (player-home 123))
@@ -41968,15 +41967,6 @@ EDITS: 1
 				  (lambda () (set! *with-toolbar* 123))
 				  (lambda () (set! *with-tooltips* 123))))
 		
-		(when (provided? 'snd-motif)
-		  (for-each (lambda (arg)
-			      (check-error-tag 'no-such-widget arg))
-			    (vector (lambda () (widget-position '(Widget 0)))
-				    (lambda () (widget-size '(Widget 0)))
-				    (lambda () (widget-text '(Widget 0)))
-				    (lambda () (set! (widget-position '(Widget 0)) (list 0 0)))
-				    (lambda () (set! (widget-size '(Widget 0)) (list 10 10)))
-				    (lambda () (set! (widget-text '(Widget 0)) "hiho")))))
 		(let ((ind (open-sound "oboe.snd"))) 
 		  (set! *selection-creates-region* #t)
 		  (select-all)
@@ -42175,18 +42165,7 @@ EDITS: 1
 	      
 	      (if (pair? (sounds))
 		  (snd-display "sounds after error checks: ~A~%" (map short-file-name (sounds))))
-	      
-	      (if (provided? 'snd-motif)
-		  (for-each
-		   (lambda (n name)
-		     (let ((tag (catch #t
-				  (lambda () (n (list 'Widget 0)))
-				  (lambda args (car args)))))
-		       (if (not (eq? tag 'no-such-widget))
-			   (snd-display "~A of null widget -> ~A" name tag))))
-		   (list widget-position widget-size widget-text hide-widget show-widget focus-widget)
-		   '(widget-position widget-size widget-text hide-widget show-widget focus-widget)))
-	      
+	      	      
 	      ;; ---------------- key args
 	      (let ((a1 (list 1.5 str-3 (list 0 1) 12 float-vector-3 :wave -1 0 1 #f #t () vector-0 delay-32)))
 		(for-each

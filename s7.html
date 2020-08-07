@@ -3834,7 +3834,7 @@ In GUI toolkits hooks are called callback-lists, in CL conditions,
 in other contexts watchpoints or signals.  s7 itself has several
 hooks: <a href="#errorhook">*error-hook*</a>, <a href="#readerrorhook">*read-error-hook*</a>,
 <a href="#unboundvariablehook">*unbound-variable-hook*</a>, *missing-close-paren-hook*, *rootlet-redefinition-hook*,
-and <a href="#loadhook">*load-hook*</a>.
+<a href="#loadhook">*load-hook*</a>, and *autoload-hook*.
 make-hook is:
 </p>
 
@@ -4153,6 +4153,8 @@ are:
 (open-output-string)                  ; open a string output port
 (get-output-string port clear)        ; return output accumulated in the string output port
 (open-input-string string)            ; open a string input port reading string
+(open-input-function function)        ; open a function input port
+(open-output-function function)       ; open a function output port
 </pre>
 
 <pre class="indented">
@@ -4200,6 +4202,9 @@ arbitrary widgets. The function ports provide a way to redirect IO in C.  See <a
 for an example.
 </p>
 
+<p>The function ports call a function rather than reading or writing the data to a string or file.
+See nrepl.scm and s7test.scm for examples.
+</p>
 
 <blockquote>
 
@@ -4263,17 +4268,7 @@ Another example: <code>(or (eof-object? x) (eqv x 24)...)</code> can be instead:
 The default IO ports are *stdin*, *stdout*, and *stderr*.
 *stderr* is useful if you want to make sure output is flushed out immediately.
 The default output port is *stdout* which buffers output until a newline is seen.
-In most REPLs, the input port is set up by the REPL, so you need to use
-*stdin* if you want to read from the terminal instead:  
 </p>
-
-<pre class="indented">
-&gt; (read-char)
-<em class="gray">#&lt;eof&gt;</em>
-&gt; (read-char *stdin*)
-a          ; here s7 waited for me to type "a" in the terminal
-<em class="gray">#\a</em>        ; this is the REPL reporting what read-char returned
-</pre>
 
 </div>
 
@@ -5882,7 +5877,8 @@ Better ideas are always welcome!
 <li>*stdin* *stdout* *stderr*
 <li>*s7*
 <li>+nan.0 -nan.0 +inf.0 -inf.0 (what crappy names! +nan.0 is a positive inexact integer that is not a number?)
-<li>*unbound-variable-hook* *missing-close-paren-hook* *load-hook* *error-hook* *read-error-hook* *rootlet-redefinition-hook*
+<li>*unbound-variable-hook* *missing-close-paren-hook* *load-hook* *autoload-hook*
+<li>*error-hook* *read-error-hook* *rootlet-redefinition-hook*
 </ul>
 
 <p>(<b><em class=def id="currentfunction">*function*</em></b>) returns the name (or name and location) of the function currently being called.
@@ -9092,7 +9088,7 @@ s7_load_path returns this list, and s7_add_to_load_path adds a directory name to
 <p>
 s7_autoload adds a symbol to the <a href="#autoload">autoload table</a>.  As a convenience,
 s7_autoload_set_names adds an array of names+files.  The array should be sorted alphabetically
-by string<? acting on the symbol names (not the file names), and the size argument is the number
+by string&lt;? acting on the symbol names (not the file names), and the size argument is the number
 of symbol names (half the actual array size).
 snd-xref.c in Snd has more than 5000 such
 names:
@@ -9172,6 +9168,7 @@ s7_pointer s7_define_variable_with_documentation(s7_scheme *sc, const char *name
 
 s7_pointer s7_define_constant(s7_scheme *sc, const char *name, s7_pointer value);
 s7_pointer s7_define_constant_with_documentation(s7_scheme *sc, const char *name, s7_pointer value, const char *help);
+s7_pointer s7_define_constant_with_environment(s7_scheme *sc, s7_pointer envir, const char *name, s7_pointer value);
 
 s7_pointer s7_define_function(s7_scheme *sc, const char *name, s7_function fnc, 
                               s7_int required_args, s7_int optional_args, bool rest_arg, const char *doc);
@@ -9223,10 +9220,17 @@ s7_pointer s7_typed_dilambda(s7_scheme *sc,
 		       s7_int set_req_args, s7_int set_opt_args,
 		       const char *documentation,
  		       s7_pointer get_sig, s7_pointer set_sig);
+s7_pointer s7_dilambda_with_environment(s7_scheme *sc, s7_pointer envir,
+		       const char *name,
+		       s7_pointer (*getter)(s7_scheme *sc, s7_pointer args),
+		       s7_int get_req_args, s7_int get_opt_args,
+		       s7_pointer (*setter)(s7_scheme *sc, s7_pointer args),
+	               s7_int set_req_args, s7_int set_opt_args,
+		       const char *documentation);
 </pre>
 <p>The s7_define* functions add a symbol and its binding to either the top-level (global) environment
 or, in s7_define, the 'env' passed as the second argument.  Use s7_set_shadow_rootlet to
-temporarily replace the top-level environment (s7_rootlet) with some other let.
+import the current let into rootlet.
 </p>
 <pre class="indented">
 s7_define(s7, s7_curlet(s7), s7_make_symbol(s7, "var"), s7_make_integer(s7, 123));
@@ -9487,7 +9491,7 @@ s7_pointer s7_open_input_string(s7_scheme *sc, const char *input_string);
 s7_pointer s7_open_output_string(s7_scheme *sc);
 const char *s7_get_output_string(s7_scheme *sc, s7_pointer out_port);
 
-typedef enum {S7_READ, S7_READ_CHAR, S7_READ_LINE, S7_READ_BYTE, S7_PEEK_CHAR, S7_IS_CHAR_READY} s7_read_t;
+typedef enum {S7_READ, S7_READ_CHAR, S7_READ_LINE, S7_PEEK_CHAR, S7_IS_CHAR_READY, S7_NUM_READ_CHOICES} s7_read_t;
 s7_pointer s7_open_output_function(s7_scheme *sc, void (*function)(s7_scheme *sc, uint8_t c, s7_pointer port));  
 s7_pointer s7_open_input_function(s7_scheme *sc, s7_pointer (*function)(s7_scheme *sc, s7_read_t read_choice, s7_pointer port));
 
@@ -9605,7 +9609,7 @@ s7_slot_set_value sets the value; s7_slot_set_real_value sets the mutable real v
 s7_slot takes a symbol and tries to find its currently active slot.  s7_set_curlet sets curlet, returning
 the previous curlet.
 </p>
-<p>s7_shadow_rootlet and s7_set_shadow_rootlet get and set a temporary rootlet.  This is aimed
+<p>s7_shadow_rootlet and s7_set_shadow_rootlet make it easier to import a let into rootlet.  This is also aimed
 at code that is defining lots of functions and variables, using the default functions like s7_define_variable
 that place things in the rootlet, but the code actually wants all those objects stored
 in a let other than rootlet.  libgtk_s7.c, for example, uses s7_define_typed_function for the
@@ -9620,10 +9624,19 @@ s7_set_shadow_rootlet(sc, old_shadow);
 </pre>
 <p>s7_set_shadow_rootlet returns the previous shadow rootlet,
 so this turns the current environment into a shadow rootlet while defining functions, then restores
-the old rootlet.  The result is the *gtk* "library" (i.e. let).  Nothing from gtk leaks into the
-rest of the code, but everything is accessible via (*gtk* 'whatever).
+the old rootlet.  The result is the *gtk* "library" (i.e. let).  The gtk names are not in
+the rootlet, but are accessible in scheme without explicit reference to *gtk*.
 </p>
-
+<p>Similarly notcurses_s7.c places everything in the *notcurses* let,
+but uses s7_set_shadow_rootlet to make these available in scheme as if they were in the rootlet:
+</p>
+<pre class="indented">
+  s7_pointer notcurses_let, old_shadow;
+  s7_define_constant(sc, "*notcurses*", notcurses_let = s7_inlet(sc, s7_nil(sc)));
+  old_shadow = s7_set_shadow_rootlet(sc, notcurses_let);
+  /* ... here we have all the s7_defines ... */
+  s7_set_shadow_rootlet(sc, old_shadow);
+</pre>
 
 <div class="shortheader" id="csymbols">Symbols</div>
 <pre class="indented">
@@ -9794,6 +9807,7 @@ etc...
 
 bool s7_is_list(s7_scheme *sc, s7_pointer p);
 bool s7_is_proper_list(s7_scheme *sc, s7_pointer p);
+s7_pointer s7_make_list(s7_scheme *sc, s7_int length, s7_pointer initial_value);
 s7_int s7_list_length(s7_scheme *sc, s7_pointer a);
 s7_pointer s7_list(s7_scheme *sc, s7_int num_values, ...);
 s7_pointer s7_list_nl(s7_scheme *sc, s7_int num_values, ...);
@@ -9886,6 +9900,7 @@ apply to multidimensional cases.  All four functions can be used on any type of 
 bool s7_is_c_pointer(s7_pointer arg);
 bool s7_is_c_pointer_of_type(s7_pointer arg, s7_pointer type);
 void *s7_c_pointer(s7_pointer p);
+void *s7_c_pointer_with_type(s7_scheme *sc, s7_pointer p, s7_pointer expected_type, const char *caller, s7_int argnum);
 s7_pointer s7_make_c_pointer(s7_scheme *sc, void *ptr);
 s7_pointer s7_make_c_pointer_with_type(s7_scheme *sc, void *ptr, s7_pointer type, s7_pointer info);
 s7_pointer s7_c_pointer_type(s7_pointer p);
@@ -9896,9 +9911,11 @@ s7 from one C function to another.  See, for example, libgtk_s7.c which passes
 gtk widget pointers around as c-pointers in s7.
 The "type" field can hold a type
 indication, useful in debugging.  s7_c_pointer_of_type checks that the c-pointer's
-type field matches the type passed as the second argument. 
-Nothing stops you from using these fields any way you
-like, of course.  
+type field matches the type passed as the second argument. As a convenience, 
+s7_c_pointer_with_type combines s7_c_pointer with s7_is_c_pointer_of_type,
+calling s7_error if the types don't match.
+Nothing else in s7 assumes the type field is actually a type symbol, so you
+can use the type and info fields for any purpose.
 </p>
 
 
@@ -10140,7 +10157,7 @@ functions are explained <a href="#beginhook">above</a>.
   <li>write.scm has a pretty printer
 </ul>
 <p>
-libc.scm, libgsl.scm, libm.scm, libdl.scm, libutf8proc.scm, and libgdbm.scm tie the associated
+libc.scm, libgsl.scm, libm.scm, libdl.scm, notcurses_s7.c, libgtk_s7.c, libutf8proc.scm, and libgdbm.scm tie the associated
 libraries into s7.
 gdbinit has some gdb commands for s7. 
 </p>
@@ -10648,7 +10665,9 @@ x: 32
 	      (drop-into-repl (owlet)))))
 </pre>
 
-<p>See the end of repl.scm for more examples.
+<p>See the end of repl.scm for more examples.  See nrepl.scm for a better version of repl.scm (mouse support,
+scrollable, resizable panes, etc).  Eventually I'll retire repl.scm, and rewrite this section to describe
+nrepl.scm.
 </p>
 
 <!--
@@ -10719,8 +10738,8 @@ A pattern can be:
   (match? x '(+ #&lt;symbol?&gt; 1)))                  ; returns #t if x is of the form '(+ x 1), x any symbol
 
 (define match+
-  (let* ((match? ((funclet 'case*) 'case*-match?))
-	 (labels ((funclet 'case*) 'case*-labels))) ; these are the labels and their values
+  (let ((match? ((funclet 'case*) 'case*-match?))
+	(labels ((funclet 'case*) 'case*-labels))) ; these are the labels and their values
     (macro (arg)
       (cond ((null? arg) ())
 	    ((match? arg '(+ #&lt;a:&gt; (+ #&lt;b:...&gt;))) `(+ ,(labels 'a) ,@(cadr (labels 'b))))
