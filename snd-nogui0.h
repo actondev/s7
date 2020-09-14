@@ -19,7 +19,6 @@
 #define deactivate_widget(Wid) Wid = 0
 
 #define Xen_wrap_widget(Value) Xen_false
-#define Xen_wrap_window(Value) Xen_false
 #define Xen_unwrap_widget(Value) 0
 #define Xen_is_widget(Value) 0
 #define NULL_WIDGET 0
@@ -62,9 +61,9 @@ typedef struct {
 
 typedef enum {NOT_A_SCANF_WIDGET} scanf_widget_t;
 
-#define snd_ShiftMask 0
-#define snd_ControlMask 0
-#define snd_MetaMask 0
+#define ShiftMask 0
+#define ControlMask 0
+#define MetaMask 0
 
 #define main_shell(a) 0
 #define main_pane(a) 0

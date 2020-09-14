@@ -20,7 +20,6 @@
 #define LOTSA_PIXELS 10000
 
 #define Xen_wrap_widget(Value)    ((Value) ? Xen_list_2(C_string_to_Xen_symbol("Widget"), Xen_wrap_C_pointer(Value)) : Xen_false)
-#define Xen_wrap_window(Value)    ((Value) ? Xen_list_2(C_string_to_Xen_symbol("Window"), C_ulong_to_Xen_ulong(Value)) : Xen_false)
 #define Xen_unwrap_widget(Value)  (Xen_is_list(Value) ? Xen_unwrap_C_pointer(Xen_cadr(Value)) : 0)
 #define Xen_is_widget(Value)      (Xen_is_list(Value) && (Xen_list_length(Value) >= 2) && (Xen_is_symbol(Xen_car(Value))) && \
                                      (strcmp("Widget", Xen_symbol_to_C_string(Xen_car(Value))) == 0))
@@ -98,12 +97,10 @@ typedef enum {WITHOUT_DATA_LOCATION_FIELD, WITH_DATA_LOCATION_FIELD} dialog_data
 typedef enum {WITHOUT_HEADER_TYPE_FIELD, WITH_HEADER_TYPE_FIELD} dialog_header_type_t;
 typedef enum {WITHOUT_COMMENT_FIELD, WITH_COMMENT_FIELD} dialog_comment_t;
 
-#define snd_ShiftMask ShiftMask
-#define snd_ControlMask ControlMask
 #if (!HAVE_SUN)
-  #define snd_MetaMask Mod1Mask
+  #define MetaMask Mod1Mask
 #else
-  #define snd_MetaMask (Mod1Mask | Mod4Mask)
+  #define MetaMask (Mod1Mask | Mod4Mask)
 #endif
 
 #define main_shell(a) (a)->mainshell

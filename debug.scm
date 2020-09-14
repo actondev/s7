@@ -4,7 +4,7 @@
 
   (define trace-in
     (let (;; these are for external use
-	  (*debug-port* *stderr*)             ; an output (string) port or #f
+	  (*debug-port* *stderr*)             ; an output port or #f
 	  (*debug-stack* #f)                  ; either a vector or #f (provides a C-style call stack)
 	  (*debug-function* #f)               ; either #f or a function of 3 arguments, the current function, the calling expression, and the current environment
 	  ;; these are normally internal
@@ -15,7 +15,8 @@
 	  (*debug-max-spaces* (*s7* 'max-format-length))
 	  (*debug-start-output* (lambda (p) #f))
 	  (*debug-end-output* newline)
-	  (*debug-curlet* #f))                ; currently just for debug-frame
+	  (*debug-curlet* #f)                ; currently just for debug-frame
+	  (*debug-unwatch-hook* (make-hook 'var)))
 
       (set! (setter '*debug-spaces*) integer?)
       (set! (setter '*debug-max-spaces*) integer?)
@@ -314,7 +315,7 @@
 	 (set! (setter ,(cadr var))
 	       (let ((old-setter (setter ,(cadr var))))
 		 (lambda (s v e)
-		   (format (debug-port) "let-set! ~S to ~S~%" s v)
+		   (format (debug-port) "~S set! to ~S~%" s v)
 		   (if old-setter
 		       (if (eqv? (cdr (arity old-setter)) 2)
 			   (old-setter s v)
@@ -323,11 +324,7 @@
       `(set! (setter ',var)
 	     (let ((old-setter (setter ',var)))
 	       (lambda (s v e)
-		 (format (debug-port) "~S set! to ~S~A~%" s v
-			 (if (let? e) ; might be (rootlet) == ()
-			     (let ((func (*function* e)))
-			       (if (memq func '(#f #<undefined>)) "" (format #f ", ~S" func)))
-			     ""))
+		 (format (debug-port) "~S set! to ~S~%" s v)
 		 (if old-setter
 		     (if (eqv? (cdr (arity old-setter)) 2)
 			 (old-setter s v)
@@ -338,9 +335,11 @@
 (define-macro (unwatch var)
   (if (pair? var)
       `(with-let ,(car var)
-	 (set! (setter ,(cadr var)) (with-let (funclet (setter ,(cadr var))) old-setter)))
-      `(set! (setter ',var) (with-let (funclet (setter ',var)) old-setter))))
-
+	 (set! (setter ,(cadr var)) (with-let (funclet (setter ,(cadr var))) old-setter)) ; (cadr var) is a quoted symbol or a keyword(?)
+	 (((funclet trace-in) '*debug-unwatch-hook*) ,(cadr var)))
+      `(begin
+	 (set! (setter ',var) (with-let (funclet (setter ',var)) old-setter))
+	 (((funclet trace-in) '*debug-unwatch-hook*) ',var))))
 
 ;;; -------- stack
 (define (show-debug-stack)
@@ -387,7 +386,7 @@
 ;; debug-stack in s7_error if debug.scm loaded, debug>1 and stack exists
 ;;   if sc->debug>1, we know trace-in is loaded, so closure_let(symbol->value(sc, make_symbol(sc, "trace-in"))) has *debug-stack* etc
 
-;; in gtk|motif-snd, break does not stop or give the right prompt, but curlet is correct??
+;; in motif-snd, break does not stop or give the right prompt, but curlet is correct??
 ;;   (load "debug.scm")
 ;;     #<lambda (call e)>
 ;;   (set! (*s7* 'debug) 1)

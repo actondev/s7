@@ -5,7 +5,7 @@
 #   gmp, mpfr, and mpc deliberately have none!
 
 
-AC_INIT(snd, 20.7, bil@ccrma.stanford.edu, ftp://ccrma-ftp.stanford.edu/pub/Lisp/snd-20.tar.gz)
+AC_INIT(snd, 20.8, bil@ccrma.stanford.edu, ftp://ccrma-ftp.stanford.edu/pub/Lisp/snd-20.tar.gz)
 
 AC_CONFIG_SRCDIR(snd.c)
 AC_CANONICAL_HOST # needed by case $host below
@@ -24,20 +24,20 @@ LOCAL_LANGUAGE="None"
 GRAPHICS_TOOLKIT="None"
 
 PACKAGE=Snd
-VERSION=20.7
+VERSION=20.8
 
 #--------------------------------------------------------------------------------
 # configuration options
 #   --with-motif          use Motif
-#   --with-gtk            use Gtk (the default)
 #   --with-alsa           use ALSA if possible (the default)
 #   --with-oss            use OSS 
 #   --with-jack           use Jack
 #   --without-audio       stub out all audio
 #   --with-gmp            include multiprecision arithmetic via gmp, mpfr, and mpc
-#   --disable-deprecated  do not include any deprecated stuff (in gtk, motif, s7, sndlib, clm, etc)
+#   --disable-deprecated  do not include any deprecated stuff (in motif, s7, sndlib, clm, etc)
 #   --with-ladspa         include LADSPA plugin support (Linux)
 #   --with-gui            make Snd with(out) any graphics support
+#   --with-notcurses      make Snd with notcurses (text-based interface)
 #   --with-forth          use Forth as the extension language
 #   --with-ruby           use Ruby as the extension language
 #   --with-s7             use s7 as the extension language (default = yes)
@@ -58,8 +58,8 @@ VERSION=20.7
 #   --with-webserver      use webserver
 
 
-AC_ARG_WITH(gtk,         [  --with-gtk		  use Gtk to build Snd])
 AC_ARG_WITH(gui,         [  --with-gui  	      	  make Snd with graphics support])
+AC_ARG_WITH(notcurses,   [  --with-notcurses  	      	  make Snd with notcurses])
 AC_ARG_WITH(gl,          [  --with-gl		  include OpenGL support, Motif only])
 AC_ARG_WITH(gl2ps,       [  --with-gl2ps		  include gl2ps, Motif only])
 AC_ARG_WITH(motif,	 [  --with-motif	  	  use libXm to build Snd])
@@ -91,7 +91,7 @@ AC_ARG_WITH(save-dir,    [  --with-save-dir	  directory to use for saved-state f
 AC_ARG_WITH(doc-dir,     [  --with-doc-dir	  directory to search for documentation], AC_DEFINE_UNQUOTED(MUS_DEFAULT_DOC_DIR, "${withval}"))
 AC_ARG_WITH(webserver,   [  --with-webserver 	  use webserver, default=no])
 
-AC_ARG_ENABLE(deprecated,[  --disable-deprecated	  do not include any deprecated stuff from gtk, s7, motif, clm, snd, or sndlib])
+AC_ARG_ENABLE(deprecated,[  --disable-deprecated	  do not include any deprecated stuff from s7, motif, clm, libgsl, snd, or sndlib])
 
 
 AC_C_BIGENDIAN
@@ -187,9 +187,7 @@ fi
 #--------------------------------------------------------------------------------
 
 # graphics: motif chosen if --with-motif
-#           no gui chosen if --without-gui
-#           gtk chosen if neither of above and we can find gtk-2.0.pc or gtk-3.0.pc, or gtk4.pc?
-#           else no gui
+#           else no gui (notcurses possible)
 
 XLIBS=""
 XFLAGS=""
@@ -197,17 +195,18 @@ XFLAGS=""
 GX_FILES=""
 GX_HEADERS=""
 
-GTK_FILES=""
-GTK_HEADERS=""
-GTK_CFLAGS=""
-GTK_LIBS=""
-GTK_LD_LIBS=""
+GRFX_FILES=""
+GRFX_HEADERS=""
+GRFX_CFLAGS=""
+GRFX_LIBS=""
+GRFX_LD_LIBS=""
 
 ac_snd_gui_choice=none
 
-if test "$with_motif" = no && test "$with_gtk" = no ; then
+if test "$with_motif" = no ; then
   with_gui=no
 fi
+# Motif has no pkg-config file, so to make it the default would mean looking for /usr/include/Xm or something 
 
 if test "$with_gui" = no ; then
   AC_DEFINE(USE_NO_GUI)
@@ -226,7 +225,7 @@ fi
 if test "$with_motif" = yes ; then
   AC_PATH_XTRA
 
-  GTK_FLAGS="$X_CFLAGS"
+  GRFX_FLAGS="$X_CFLAGS"
   X_POST_LIBS="-lX11 $X_EXTRA_LIBS -lXext"
   case "$host" in
     *-apple-*)
@@ -247,7 +246,7 @@ if test "$with_motif" = yes ; then
     X_PRE_LIBS="$X_PRE_LIBS -lXmu"
   fi
 
-  GTK_LIBS="$X_PRE_LIBS $X_POST_LIBS -lXpm"
+  GRFX_LIBS="$X_PRE_LIBS $X_POST_LIBS -lXpm"
   AC_DEFINE(USE_MOTIF)
   GRAPHICS_TOOLKIT="Motif"
   ac_snd_gui_choice=Motif
@@ -255,37 +254,20 @@ fi
 
 
 #--------------------------------------------------------------------------------
-# Gtk
+# notcurses
 #--------------------------------------------------------------------------------
 
-if test "$ac_snd_gui_choice" = none ; then
-  if test x$PKG_CONFIG != xno ; then
-
-#    m4_foreach([gtk_version], [[gtk4], [gtk+-3.0], [gtk+-2.0]],
-     m4_foreach([gtk_version], [[gtk+-3.0], [gtk+-2.0]],
-       [
-       if test "$ac_snd_gui_choice" = none ; then
-         if $PKG_CONFIG gtk_version --exists ; then
-           GTK_CFLAGS="`$PKG_CONFIG gtk_version --cflags`"
-           GTK_LIBS="`$PKG_CONFIG gtk_version --libs`"
-           GTK_LD_LIBS="`$PKG_CONFIG gtk_version --libs-only-L` `$PKG_CONFIG gtk_version --libs-only-l`"
-           ac_snd_gui_choice=gtk
-           GRAPHICS_TOOLKIT=Gtk-`$PKG_CONFIG gtk_version --modversion`
-         fi
-       fi
-       ])
- 
-    if test "$ac_snd_gui_choice" = gtk ; then  
-      GX_FILES="GTK_O_FILES"
-      GX_HEADERS="SND_G_HEADERS"
-      AC_DEFINE(USE_GTK)
- 
-      if test x$PKG_CONFIG != xno ; then
-        CAIRO_CFLAGS="`$PKG_CONFIG cairo --cflags-only-I`"
-        AC_SUBST(CAIRO_CFLAGS)
-      fi
+if test "$with_notcurses" = yes ; then
+  AC_DEFINE(USE_NO_GUI)
+  GX_FILES="NO_GUI_O_FILES"
+  GX_HEADERS="NO_GUI_HEADERS"
+  ac_snd_gui_choice=notcurses
+  if $PKG_CONFIG notcurses --exists ; then
+    GRFX_CFLAGS="`$PKG_CONFIG notcurses --cflags`"
+    GRFX_LIBS="`$PKG_CONFIG notcurses --libs`"
+    GRAPHICS_TOOLKIT=Notcurses-`$PKG_CONFIG notcurses --modversion`
+    AC_DEFINE(USE_NOTCURSES)
     fi
-  fi
 fi
 
 
@@ -314,9 +296,9 @@ AC_SUBST(XFLAGS)
 AC_SUBST(GX_FILES)
 AC_SUBST(GX_HEADERS)
 
-AC_SUBST(GTK_LIBS)
-AC_SUBST(GTK_CFLAGS)
-AC_SUBST(GTK_LD_LIBS)
+AC_SUBST(GRFX_LIBS)
+AC_SUBST(GRFX_CFLAGS)
+AC_SUBST(GRFX_LD_LIBS)
 
 
 
@@ -398,11 +380,7 @@ if test "$with_ruby" = yes ; then
           XEN_LIBS="`$PKG_CONFIG ruby_version --libs`"
           LOCAL_LANGUAGE=Ruby-`$PKG_CONFIG ruby_version --modversion`
           ac_snd_extension_language=Ruby
-          if test "$ac_snd_gui_choice" = gtk ; then
-            S7_LIB="xg.o"
-          else
-            S7_LIB=""
-          fi
+          S7_LIB=""
           AC_SUBST(S7_LIB)
         fi
       fi
@@ -425,11 +403,7 @@ if test "$with_forth" = yes ; then
     AC_DEFINE(HAVE_FORTH)
     LOCAL_LANGUAGE="Forth"
     ac_snd_extension_language=Forth
-    if test "$ac_snd_gui_choice" = gtk ; then
-      S7_LIB="xg.o"
-    else
-      S7_LIB=""
-    fi
+    S7_LIB=""
     AC_SUBST(S7_LIB)
   else
     AC_MSG_RESULT([no])
@@ -445,11 +419,7 @@ if test "$with_s7" != no && test "$ac_snd_extension_language" = none ; then
   AC_DEFINE(HAVE_SCHEME)	
   ac_snd_extension_language=s7
   LOCAL_LANGUAGE="s7"
-  if test "$ac_snd_gui_choice" = gtk ; then
-    S7_LIB="s7.o libgtk_s7.o"
-  else
-    S7_LIB="s7.o"
-  fi
+  S7_LIB="s7.o"
   AC_SUBST(S7_LIB)
 fi
 
@@ -675,6 +645,7 @@ SO_LD="ld"
 
 case "$host" in
   *-*-linux*) 
+    CFLAGS="-Wno-stringop-overflow $CFLAGS"
     LDSO_FLAGS="-shared"
     LIBS="$LIBS -lm -ldl"
     if test "$GCC" = yes ; then
@@ -823,7 +794,7 @@ esac
 #--------------------------------------------------------------------------------
 
 if test "$enable_deprecated" = no ; then
-  CFLAGS="-DGTK_DISABLE_DEPRECATED -DG_DISABLE_DEPRECATED -DGDK_DISABLE_DEPRECATED -DPANGO_DISABLE_DEPRECATED -DCAIRO_DISABLE_DEPRECATED -DGSL_DISABLE_DEPRECATED -Wall $CFLAGS"
+  CFLAGS="-DGSL_DISABLE_DEPRECATED -Wall -Wno-array-bounds -Wno-stringop-overflow $CFLAGS"
   AC_DEFINE(DISABLE_DEPRECATED)
 fi
 

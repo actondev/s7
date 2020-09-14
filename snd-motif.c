@@ -860,7 +860,7 @@ void draw_string(graphics_context *ax, int x0, int y0, const char *str, int len)
 
 void gtk_style_draw_string(graphics_context *ax, int x0, int y0, const char *str, int len)
 {
-  /* for callers of Scheme-level draw-string, the Motif and Gtk versions should agree on where "y0" is */
+  /* for callers of Scheme-level draw-string, the Motif and (now removed Gtk) versions should agree on where "y0" is */
   XGCValues gv;
   static XFontStruct *fs = NULL;
 
@@ -5120,7 +5120,7 @@ static void base_click_callback(Widget w, XtPointer context, XtPointer info)
   XButtonEvent *ev;
   int val;
   ev = (XButtonEvent *)(cb->event);
-  if (ev->state & (snd_ControlMask | snd_MetaMask)) 
+  if (ev->state & (ControlMask | MetaMask)) 
     val = base_last_value; 
   else val = BASE_MID; /* this is supposedly 1.0 */
   base_changed(val);
@@ -14566,7 +14566,7 @@ static void view_files_display_list(view_files_info *vdat)
     {
       int i, old_len;
       char **old_names = NULL;
-      widget_t last_row = NULL_WIDGET; /* ignored in gtk version */
+      widget_t last_row = NULL_WIDGET; 
 
       old_len = vdat->currently_selected_files;
       if (old_len > 0)
@@ -15513,7 +15513,7 @@ static void view_files_select_callback(Widget w, XtPointer context, XtPointer in
 	}
     }
   mouse_down_time = ev->time;
-  view_files_select((vf_row *)context, ev->state & snd_ShiftMask);
+  view_files_select((vf_row *)context, ev->state & ShiftMask);
 }
 
 
@@ -17334,7 +17334,7 @@ static drop_watcher_t *find_drop_watcher(Widget caller)
 static Atom FILE_NAME;               /* Sun uses this, SGI uses STRING */
 static Atom COMPOUND_TEXT;           /* various Motif widgets use this and the next */
 static Atom _MOTIF_COMPOUND_STRING;
-static Atom text_plain;              /* gtk uses this -- apparently a url */
+static Atom text_plain;
 static Atom uri_list;                /* rox uses this -- looks just like text/plain to me */
 static Atom TEXT;                    /* ditto */
 
@@ -21017,7 +21017,7 @@ void check_menu_labels(int key, int state, bool extended)
   /* user has redefined key, so erase old key binding info from the menu label */
   if (extended)
     {
-      if (state == snd_ControlMask)
+      if (state == ControlMask)
 	{
 	  if (key == snd_K_f) set_label(file_open_menu, "Open"); else
 	  if (key == snd_K_s) set_label(file_save_menu, "Save"); else
@@ -21040,7 +21040,7 @@ void check_menu_labels(int key, int state, bool extended)
 #if HAVE_EXTENSION_LANGUAGE
   else 
     {
-      if ((key == snd_K_s) && (state == snd_ControlMask))
+      if ((key == snd_K_s) && (state == ControlMask))
 	set_label(edit_find_menu, I_FIND);
     }
 #endif
@@ -23322,16 +23322,14 @@ static void listener_return(widget_t w, int last_prompt)
 	     *   the evaluator already in a separate thread.  If we block on the thread ID (pthread_self), bad stuff still gets
 	     *   through somehow.  
 	     *
-	     * s7 threads here only solves the s7 side of the problem.  To make the Gtk calls thread-safe,
-	     *   we have to use gdk threads, and that means either wrapping every gtk section thoughout Snd in
-	     *   gdk_thread_enter/leave, or expecting the caller to do that in every expression he types in the listener.
+	     * s7 threads here only solves the s7 side of the problem.
 	     *
-	     * So... set begin_hook to a func that calls gtk_main_iteration or check_for_event;
+	     * So... set begin_hook to a func that calls check_for_event;
 	     *   if C-g, the begin_hook func returns true, and s7 calls s7_quit, and C_g_typed is true here.
 	     *   Otherwise, I think anything is safe because we're only looking at the block start, and
 	     *   we're protected there by a stack barrier.  
 	     *
-	     * But this polling at block starts is expensive, mainly because XtAppPending and gtk_events_pending
+	     * But this polling at block starts is expensive, mainly because XtAppPending
 	     *   are very slow.  So with_interrupts can turn off this check.
 	     */
 	    
@@ -25367,7 +25365,7 @@ static void f_toggle_callback(Widget w, XtPointer context, XtPointer info)
   XmToggleButtonCallbackStruct *cb = (XmToggleButtonCallbackStruct *)info;
   XButtonEvent *ev;
   ev = (XButtonEvent *)(cb->event);
-  f_button_callback((chan_info *)context, cb->set, (ev->state & snd_ControlMask));
+  f_button_callback((chan_info *)context, cb->set, (ev->state & ControlMask));
 }
 
 
@@ -25376,7 +25374,7 @@ static void w_toggle_callback(Widget w, XtPointer context, XtPointer info)
   XmToggleButtonCallbackStruct *cb = (XmToggleButtonCallbackStruct *)info;
   XButtonEvent *ev;
   ev = (XButtonEvent *)(cb->event);
-  w_button_callback((chan_info *)context, cb->set, (ev->state & snd_ControlMask));
+  w_button_callback((chan_info *)context, cb->set, (ev->state & ControlMask));
 }
 
 
@@ -25769,7 +25767,7 @@ void graph_key_press(Widget w, XtPointer context, XEvent *event, Boolean *cont)
   key_state = ev->state;
   keysym = XkbKeycodeToKeysym(XtDisplay(w),
 			      (int)(ev->keycode),
-			      0, (key_state & snd_ShiftMask) ? 1 : 0);
+			      0, (key_state & ShiftMask) ? 1 : 0);
   key_press_callback(any_selected_channel(sp), ev->x, ev->y, ev->state, keysym);
 }
  
@@ -25785,7 +25783,7 @@ static void cp_graph_key_press(Widget w, XtPointer context, XEvent *event, Boole
   key_state = ev->state;
   keysym = XkbKeycodeToKeysym(XtDisplay(w),
 			      (int)(ev->keycode),
-			      0, (key_state & snd_ShiftMask) ? 1 : 0);
+			      0, (key_state & ShiftMask) ? 1 : 0);
   key_press_callback(cp, ev->x, ev->y, ev->state, keysym);
 }
 
@@ -26788,7 +26786,7 @@ static void amp_click_callback(Widget w, XtPointer context, XtPointer info)
   snd_info *sp = (snd_info *)context;
   XButtonEvent *ev;
   ev = (XButtonEvent *)(cb->event);
-  if (ev->state & (snd_ControlMask | snd_MetaMask)) 
+  if (ev->state & (ControlMask | MetaMask)) 
     set_amp(sp, sp->last_amp_control);
   else set_amp(sp, 1.0);
 }
@@ -26867,7 +26865,7 @@ static void speed_click_callback(Widget w, XtPointer context, XtPointer info)
 
 
   ev = (XButtonEvent *)(cb->event);
-  if (ev->state & (snd_ControlMask | snd_MetaMask)) 
+  if (ev->state & (ControlMask | MetaMask)) 
     set_speed(sp, sp->last_speed_control);
   else set_speed(sp, 1.0);
 
@@ -26974,7 +26972,7 @@ static void expand_click_callback(Widget w, XtPointer context, XtPointer info)
   snd_info *sp = (snd_info *)context;
   XButtonEvent *ev;
   ev = (XButtonEvent *)(cb->event);
-  if (ev->state & (snd_ControlMask | snd_MetaMask))
+  if (ev->state & (ControlMask | MetaMask))
     set_expand(sp, sp->last_expand_control);
   else set_expand(sp, 1.0);
 }
@@ -27052,7 +27050,7 @@ static void contrast_click_callback(Widget w, XtPointer context, XtPointer info)
   snd_info *sp = (snd_info *)context;
   XButtonEvent *ev;
   ev = (XButtonEvent *)(cb->event);
-  if (ev->state & (snd_ControlMask | snd_MetaMask))
+  if (ev->state & (ControlMask | MetaMask))
     set_contrast(sp, sp->last_contrast_control);
   else set_contrast(sp, 0.0);
 }
@@ -27142,7 +27140,7 @@ static void revscl_click_callback(Widget w, XtPointer context, XtPointer info)
   snd_info *sp = (snd_info *)context;
   XButtonEvent *ev;
   ev = (XButtonEvent *)(cb->event);
-  if (ev->state & (snd_ControlMask | snd_MetaMask))
+  if (ev->state & (ControlMask | MetaMask))
     set_revscl(sp, sp->last_reverb_control_scale);
   else set_revscl(sp, 0.0);
 }
@@ -27203,7 +27201,7 @@ static void revlen_click_callback(Widget w, XtPointer context, XtPointer info)
   snd_info *sp = (snd_info *)context;
   XButtonEvent *ev;
   ev = (XButtonEvent *)(cb->event);
-  if (ev->state & (snd_ControlMask | snd_MetaMask)) 
+  if (ev->state & (ControlMask | MetaMask)) 
     set_revlen(sp, sp->last_reverb_control_length);
   else set_revlen(sp, 1.0);
 }
@@ -27554,7 +27552,7 @@ static void play_button_callback(Widget w, XtPointer context, XtPointer info)
 
   ss->tracking = ((with_tracking_cursor(ss) != DONT_TRACK) ||
 		  ((cb->set) && 
-		   (ev->state & (snd_ControlMask | snd_MetaMask))));
+		   (ev->state & (ControlMask | MetaMask))));
 
   cp = any_selected_channel(sp);
   goto_graph(cp);
@@ -27659,9 +27657,9 @@ static void sync_button_callback(Widget w, XtPointer context, XtPointer info)
 
   ev = (XButtonEvent *)(cb->event);
   if (cb->set)
-    if (ev->state & snd_ControlMask) 
-      if (ev->state & snd_MetaMask)
-	if (ev->state & snd_ShiftMask)
+    if (ev->state & ControlMask) 
+      if (ev->state & MetaMask)
+	if (ev->state & ShiftMask)
 	  sp->sync = 4;
 	else sp->sync = 3;
       else sp->sync = 2;
@@ -27696,7 +27694,7 @@ static void unite_button_callback(Widget w, XtPointer context, XtPointer info)
 
   if (cb->set)
     {
-      if (ev->state & (snd_ControlMask | snd_MetaMask)) 
+      if (ev->state & (ControlMask | MetaMask)) 
 	val = CHANNELS_SUPERIMPOSED;
       else val = CHANNELS_COMBINED;
     }

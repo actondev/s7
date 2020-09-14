@@ -2,16 +2,14 @@
 
 \ Translator/Author: Michael Scholz <mi-scholz@users.sourceforge.net>
 \ Created: 2006/08/05 00:09:28
-\ Changed: 2017/12/29 08:50:08
+\ Changed: 2020/09/13 14:23:47
 
 \ Tags:  FIXME - something is wrong
 \        XXX   - info marker
 \
 \ Tested with:
-\   Snd 18.x
-\   Fth 1.3.x
-\
-\ The most Gtk tests will be skipped if not gtk3.
+\   Snd 20.x
+\   Fth 1.4.x
 \
 \ Reads init file ./.sndtest.fs or ~/.sndtest.fs for global variables,
 \ hooks, etc.
@@ -65,8 +63,6 @@
 'gl         provided? constant *with-test-gl*
 'gl2ps      provided? constant *with-test-gl2ps*
 'gsl        provided? constant *with-test-gsl*
-'gtk3       provided? constant *with-test-gtk3*
-'snd-gtk    provided? constant *with-test-gtk*
 'snd-ladspa provided? constant *with-test-ladspa*
 'snd-motif  provided? constant *with-test-motif*
 'snd-nogui  provided? constant *with-test-nogui*
@@ -662,15 +658,11 @@ reset-all-hooks
   *with-test-motif* if
     "motif"
   else
-    *with-test-gtk* if
-      "gtk"
+    *with-test-nogui* if
+      #t set-with-mix-tags drop
+      "nogui"
     else
-      *with-test-nogui* if
-        #t set-with-mix-tags drop
-        "nogui"
-      else
-        "unknown"
-      then
+      "unknown"
     then
   then { kind }
   stack-reset
@@ -737,7 +729,6 @@ reset-all-hooks
      "fmv3.snd"
      "fmv4.reverb"
      "fmv4.snd"
-     "gtk-errors"
      "hiho.marks"
      "hiho.snd"
      "hiho.tmp"
@@ -816,21 +807,13 @@ SIGINT lambda: { sig -- }
 *with-test-motif* [if]
   "6x12"
 [else]
-  *with-test-gtk* [if]
-    "Sans 8"
-  [else]
-    "9x15"
-  [then]
+  "9x15"
 [then] constant tiny-font-string
 
 *with-test-motif* [if]
   "9x15"
 [else]
-  *with-test-gtk* [if]
-    "Monospace 10"
-  [else]
-    "6x12"
-  [then]
+  "6x12"
 [then] constant tiny-font-set-string
 
 \ XXX: temp-dir, save-dir, ladspa-dir, peak-env-dir
@@ -1105,7 +1088,7 @@ SIGINT lambda: { sig -- }
      #( <'> with-interrupts #t )
      #( <'> remember-sound-state #f )
      #( <'> with-smpte-label #f )
-     #( <'> with-toolbar *with-test-gtk* if #t else #f then )
+     #( <'> with-toolbar #f )
      #( <'> with-tooltips #t )
      #( <'> with-menu-icons #f )
      #( <'> save-as-dialog-src #f )
@@ -1317,7 +1300,7 @@ black-and-white-colormap constant *better-colormap*
      #( <'> with-inset-graph #f )
      #( <'> with-interrupts #t )
      #( <'> with-smpte-label #f )
-     #( <'> with-toolbar *with-test-gtk* if #t else #f then )
+     #( <'> with-toolbar #f )
      #( <'> with-tooltips #t )
      #( <'> with-menu-icons #f )
      #( <'> with-pointer-focus #f )
@@ -6138,174 +6121,170 @@ lambda: <{ a b c -- r }> 1.0 ; value 08-clm-lambda-a-b-c-1.0
   3 :initial-contents #( 1.0 1.0 1.0 ) make-delay to d3
   d1 d2 d3 test-gen-equal
   \ mix (test009)
-  *with-test-gtk* unless
-    \ FIXME: set-mix-amp-env (gtk segfault)
-    \ crashes in set-mix-amp-env with gtk
-    "hiho.wave" 1 22050 mus-bshort mus-next new-sound { new-index }
-    new-index select-sound drop
-    0 new-index 0 find-mix to res
-    res if
-      "found non-existent mix: %s?" #( res ) snd-display
-    then
-    "pistol.snd" 100 mix car { mix-id }
-    mix-id mix? unless
-      "%s not mix?" #( mix-id ) snd-display
-    then
-    view-mixes-dialog drop
-    mix-id mix-position  { pos }
-    mix-id mix-length    { len }
-    mix-id mix-speed     { spd }
-    mix-id mix-home      { home-lst }
-    home-lst 0 array-ref { snd }
-    home-lst 1 array-ref { chn }
-    mix-id mix-amp       { amp }
-    mix-id make-mix-sampler { mr }
-    mr mix-sampler? unless
-      "%s is not mix-sampler?" #( mr ) snd-display
-    then
-    mr region-sampler?  if
-      "mix-sampler: region %s?" #( mr ) snd-display
-    then
-    mr sampler-position to res
-    res 0<> if
-      "mix sampler-position: %d?" #( res ) snd-display
-    then
-    mr sampler-at-end? if
-      "mix sampler-at-end: %s?" #( mr ) snd-display
-    then
-    mr sampler-home to res
-    mix-id res object-equal? unless
-      "mix sampler-home: %d %s?" #( res mr ) snd-display
-    then
-    mr object->string 0 16 string-substring to res
-    res "#<mix-sampler mi" string<> if
-      "mix sampler actually got: [%s]?" #( res ) snd-display
-    then
-    0.0 0.0 { mx sx }
-    99 0 do
-      \ XXX: i odd? if mr read-mix-sample else mr read-mix-sample then to mx
-      mr read-mix-sample to mx
-      100 i + sample to sx
-      mx sx fneq if
-        "read-mix-sample: %s %s?" #( mx sx ) snd-display
-      then
-    loop
-    \ Scheme: (mr)
-    \ Ruby:   mr.call
-    \ Forth:  mr #() apply
-    mr #() object-apply to mx
-    199 sample to sx
+  "hiho.wave" 1 22050 mus-bshort mus-next new-sound { new-index }
+  new-index select-sound drop
+  0 new-index 0 find-mix to res
+  res if
+    "found non-existent mix: %s?" #( res ) snd-display
+  then
+  "pistol.snd" 100 mix car { mix-id }
+  mix-id mix? unless
+    "%s not mix?" #( mix-id ) snd-display
+  then
+  view-mixes-dialog drop
+  mix-id mix-position  { pos }
+  mix-id mix-length    { len }
+  mix-id mix-speed     { spd }
+  mix-id mix-home      { home-lst }
+  home-lst 0 array-ref { snd }
+  home-lst 1 array-ref { chn }
+  mix-id mix-amp       { amp }
+  mix-id make-mix-sampler { mr }
+  mr mix-sampler? unless
+    "%s is not mix-sampler?" #( mr ) snd-display
+  then
+  mr region-sampler?  if
+    "mix-sampler: region %s?" #( mr ) snd-display
+  then
+  mr sampler-position to res
+  res 0<> if
+    "mix sampler-position: %d?" #( res ) snd-display
+  then
+  mr sampler-at-end? if
+    "mix sampler-at-end: %s?" #( mr ) snd-display
+  then
+  mr sampler-home to res
+  mix-id res object-equal? unless
+    "mix sampler-home: %d %s?" #( res mr ) snd-display
+  then
+  mr object->string 0 16 string-substring to res
+  res "#<mix-sampler mi" string<> if
+    "mix sampler actually got: [%s]?" #( res ) snd-display
+  then
+  0.0 0.0 { mx sx }
+  99 0 do
+    \ XXX: i odd? if mr read-mix-sample else mr read-mix-sample then to mx
+    mr read-mix-sample to mx
+    100 i + sample to sx
     mx sx fneq if
-      "read-mix-sample 100: %s %s?" #( mx sx ) snd-display
+      "read-mix-sample: %s %s?" #( mx sx ) snd-display
     then
-    mr free-sampler drop
-    \
-    100 pos <> if
-      "mix-position: %d?" #( pos ) snd-display
-    then
-    41623 len <> if
-      "mix-length: %d?" #( len ) snd-display
-    then
-    snd new-index object-equal? unless
-      "snd mix-home: %s?" #( snd ) snd-display
-    then
-    chn 0<> if
-      "chn mix-home: %d?" #( chn ) snd-display
-    then
-    amp 1.0 fneq if
-      "mix-amp: %s?" #( amp ) snd-display
-    then
-    spd 1.0 fneq if
-      "mix-speed: %s?" #( spd ) snd-display
-    then
-    mix-id <'> play #t nil fth-catch if
-      drop                      \ on stack: mix-id
-      "cannot play mix" #() snd-display
-    else
-      drop                      \ on stack: play's return value
-    then
+  loop
+  \ Scheme: (mr)
+  \ Ruby:   mr.call
+  \ Forth:  mr #() apply
+  mr #() object-apply to mx
+  199 sample to sx
+  mx sx fneq if
+    "read-mix-sample 100: %s %s?" #( mx sx ) snd-display
+  then
+  mr free-sampler drop
+  \
+  100 pos <> if
+    "mix-position: %d?" #( pos ) snd-display
+  then
+  41623 len <> if
+    "mix-length: %d?" #( len ) snd-display
+  then
+  snd new-index object-equal? unless
+    "snd mix-home: %s?" #( snd ) snd-display
+  then
+  chn 0<> if
+    "chn mix-home: %d?" #( chn ) snd-display
+  then
+  amp 1.0 fneq if
+    "mix-amp: %s?" #( amp ) snd-display
+  then
+  spd 1.0 fneq if
+    "mix-speed: %s?" #( spd ) snd-display
+  then
+  mix-id <'> play #t nil fth-catch if
+    drop                      \ on stack: mix-id
+    "cannot play mix" #() snd-display
+  else
+    drop                      \ on stack: play's return value
+  then
+  stack-reset
+  mix-id :start 1000 <'> play #t nil fth-catch if
+    stack-reset               \ on stack: mix-id :start 1000
+    "cannot play mix from 1000" #() snd-display
+  else
+    drop                      \ on stack: play's return value
     stack-reset
-    mix-id :start 1000 <'> play #t nil fth-catch if
-      stack-reset               \ on stack: mix-id :start 1000
-      "cannot play mix from 1000" #() snd-display
-    else
-      drop                      \ on stack: play's return value
-      stack-reset
+  then
+  \
+  mix-id 200 set-mix-position drop
+  mix-id 0.5 set-mix-amp drop
+  mix-id 2.0 set-mix-speed drop
+  mix-id #( 0 0 1 1 ) set-mix-amp-env drop
+  mix-id mix-amp-env to res
+  mix-id res set-mix-amp-env drop
+  mix-id mix-amp-env { res1 }
+  res res1 vequal? unless
+    "set-mix-amp-env to self: %s %s?" #( res res1 ) snd-display
+  then
+  mix-id 20 set-mix-tag-y drop
+  mix-id mix-position to pos
+  mix-id mix-speed    to spd
+  mix-id mix-amp      to amp
+  mix-id mix-tag-y    { my }
+  200 pos <> if
+    "set-mix-position: %d?" #( pos ) snd-display
+  then
+  spd 2.0 fneq if
+    "set-mix-speed: %s?" #( spd ) snd-display
+  then
+  my 20 <> if
+    "set-mix-tag-y: %d?" #( my ) snd-display
+  then
+  amp 0.5 fneq if
+    "set-mix-amp: %s?" #( amp ) snd-display
+  then
+  mix-id mix-amp-env to res
+  res #( 0.0 0.0 1.0 1.0 ) array= unless
+    "set-mix-amp-env: %s?" #( res ) snd-display
+  then
+  \
+  3 0.1 make-vct 100 #f #f #t "" mix-vct drop
+  0 set-cursor drop
+  100 #f #f find-mix { nid }
+  nid mix? false? unless
+    nid mix-position 100 <> if
+      new-index 0 mixes map
+        *key* mix-position
+      end-map { mx-pos }
+      "100 find-mix: %s %s %s?" #( nid dup mix-position mx-pos ) snd-display
     then
-    \
-    mix-id 200 set-mix-position drop
-    mix-id 0.5 set-mix-amp drop
-    mix-id 2.0 set-mix-speed drop
-    mix-id #( 0 0 1 1 ) set-mix-amp-env drop
-    mix-id mix-amp-env to res
-    mix-id res set-mix-amp-env drop
-    mix-id mix-amp-env { res1 }
-    res res1 vequal? unless
-      "set-mix-amp-env to self: %s %s?" #( res res1 ) snd-display
+  else
+    "100 find-mix: not a mix %s?" #( nid ) snd-display
+  then
+  200 #f #f find-mix to nid
+  nid mix? false? unless
+    nid mix-position 200 <> if
+      new-index 0 mixes map
+        *key* mix-position
+      end-map { mx-pos }
+      "200 find-mix: %s %s %s?" #( nid dup mix-position mx-pos ) snd-display
     then
-    mix-id 20 set-mix-tag-y drop
-    mix-id mix-position to pos
-    mix-id mix-speed    to spd
-    mix-id mix-amp      to amp
-    mix-id mix-tag-y    { my }
-    200 pos <> if
-      "set-mix-position: %d?" #( pos ) snd-display
-    then
-    spd 2.0 fneq if
-      "set-mix-speed: %s?" #( spd ) snd-display
-    then
-    my 20 <> if
-      "set-mix-tag-y: %d?" #( my ) snd-display
-    then
-    amp 0.5 fneq if
-      "set-mix-amp: %s?" #( amp ) snd-display
-    then
-    mix-id mix-amp-env to res
-    res #( 0.0 0.0 1.0 1.0 ) array= unless
-      "set-mix-amp-env: %s?" #( res ) snd-display
-    then
-    \
-    3 0.1 make-vct 100 #f #f #t "" mix-vct drop
-    0 set-cursor drop
-    100 #f #f find-mix { nid }
-    nid mix? false? unless
-      nid mix-position 100 <> if
-        new-index 0 mixes map
-          *key* mix-position
-        end-map { mx-pos }
-        "100 find-mix: %s %s %s?" #( nid dup mix-position mx-pos ) snd-display
-      then
-    else
-      "100 find-mix: not a mix %s?" #( nid ) snd-display
-    then
-    200 #f #f find-mix to nid
-    nid mix? false? unless
-      nid mix-position 200 <> if
-        new-index 0 mixes map
-          *key* mix-position
-        end-map { mx-pos }
-        "200 find-mix: %s %s %s?" #( nid dup mix-position mx-pos ) snd-display
-      then
-    else
-      "200 find-mix: not a mix %s?" #( nid ) snd-display
-    then
-    \
-    "oboe.snd" 100 mix car to mix-id
-    40 set-mix-waveform-height drop
-    'hiho mix-id 123 set-mix-property
-    'hiho mix-id mix-property to res
-    res 123 <> if
-      "mix-property: %s?" #( res ) snd-display
-    then
-    'not-here mix-id mix-property to res
-    res if
-      "mix-property not-here: %s?" #( res ) snd-display
-    then
-    #f #f update-time-graph drop
-    20 set-mix-waveform-height drop
-    new-index revert-sound drop
-    new-index close-sound drop
-  then                          \ !*with-test-gtk*
+  else
+    "200 find-mix: not a mix %s?" #( nid ) snd-display
+  then
+  \
+  "oboe.snd" 100 mix car to mix-id
+  40 set-mix-waveform-height drop
+  'hiho mix-id 123 set-mix-property
+  'hiho mix-id mix-property to res
+  res 123 <> if
+    "mix-property: %s?" #( res ) snd-display
+  then
+  'not-here mix-id mix-property to res
+  res if
+    "mix-property not-here: %s?" #( res ) snd-display
+  then
+  #f #f update-time-graph drop
+  20 set-mix-waveform-height drop
+  new-index revert-sound drop
+  new-index close-sound drop
   \ envelopes (lists, vcts, arrays) (test015)
   1.0 vct( 0.0 0.0 2.0 1.0 ) 1.0 envelope-interp dup 0.5 fneq if
     "envelope-interp 0.5: %s?" swap snd-display

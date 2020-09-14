@@ -2,18 +2,17 @@
 
 \ Author: Michael Scholz <mi-scholz@users.sourceforge.net>
 \ Created: 05/10/21 18:22:57
-\ Changed: 19/12/23 15:11:22
+\ Changed: 20/09/13 13:40:44
 \
-\ @(#)xm-enved.fs	1.37 12/23/19
+\ @(#)xm-enved.fs	1.38 9/13/20
 
 \ Commentary:
 \
-\ Requires --with-motif|gtk
+\ Requires --with-motif
 \
 \ Tested with Snd 20.x
 \             Fth 1.4.x
 \             Motif 2.3.3 X11R6
-\             (Glib 2.28.8, Pango 1.28.4, Cairo 1.10.2)
 \
 \ This is an example of an object type written in Forth.
 \
@@ -41,13 +40,6 @@
 \ xenved-test           ( name -- xe )
 
 'snd-nogui provided? [if] skip-file [then]
-
-'snd-gtk provided? [if]
-	'gtk3 provided? not [if]
-		.( snd-gtk: gtk3 required -- skipping xm-enved.fs ) cr
-		skip-file
-	[then]
-[then]
 
 require enved
 require snd-xm
@@ -290,90 +282,41 @@ hide
 	then
 ;
 
-'snd-motif provided? [if]
-	360 64 * constant 360*64
+360 64 * constant 360*64
 
-	: xe-redraw { xe -- }
-		xe xe-drawer@ { drawer }
-		drawer is-managed?
-		xe xe-py0@ xe xe-py1@ > && if
-			xe xe-gcs@ { gc }
-			drawer FXtDisplay { dpy }
-			drawer FXtWindow { win }
-			dpy win FXClearWindow drop
-			\ Motif's DRAW-AXES takes 6 optional arguments.
-			\ '( x0 y0 x1 y1 ) = draw-axes(wid gc label
-			\                        x0=0.0 x1=1.0 y0=-1.0 y1=1.0
-			\                        style=x-axis-in-seconds
-			\                        axes=show-all-axes)
-			\ arity #( 3 6 #f )
-			drawer gc xe xe-name@
-			    xe xe-bx0@ xe xe-bx1@ xe xe-by0@ xe xe-by1@
-			    x-axis-in-seconds show-all-axes draw-axes drop
-			#f #f { lx ly }
-			10 { mouse-d }
-			5  { mouse-r }
-			xe each { point }
-				xe point 0 array-ref grfx { cx }
-				xe point 1 array-ref grfy { cy }
-				dpy win gc cx mouse-r - cy mouse-r -
-				    mouse-d mouse-d 0 360*64 FXFillArc drop
-				lx if
-					dpy win gc lx ly cx cy FXDrawLine drop
-				then
-				cx to lx
-				cy to ly
-			end-each
-		then
-	;
-[else]
-	: xe-redraw { xe -- }
-		xe xe-drawer@ { drawer }
-		drawer is-managed?
-		xe xe-py0@ xe xe-py1@ > && if
-			xe xe-gcs@ { gc }
-			drawer FGTK_WIDGET widget-size { size }
-			drawer make-cairo { cairo }
-			cairo Fcairo_push_group drop
-			cairo 1.0 1.0 1.0 Fcairo_set_source_rgb drop
-			cairo 0 0 size 0 array-ref size 1 array-ref
-			    Fcairo_rectangle drop
-			cairo Fcairo_fill drop
-			\ Gtk's DRAW-AXES takes one more optional argument,
-			\ a cairo object.
-			\ '( x0 y0 x1 y1 ) = draw-axes(wid gc label
-			\                        x0=0.0 x1=1.0 y0=-1.0 y1=1.0
-			\                        style=x-axis-in-seconds
-			\                        axes=show-all-axes
-			\                        cairo)
-			\ arity #( 3 7 #f )
-			drawer gc xe xe-name@
-			    xe xe-bx0@ xe xe-bx1@ xe xe-by0@ xe xe-by1@
-			    x-axis-in-seconds show-all-axes cairo
-			    draw-axes drop
-			cairo 1.0 Fcairo_set_line_width drop
-			cairo 0.0 0.0 0.0 Fcairo_set_source_rgb drop
-			#f #f { lx ly }
-			5 { mouse-r }
-			xe each { point }
-				xe point 0 array-ref grfx { cx }
-				xe point 1 array-ref grfy { cy }
-				cairo cx cy mouse-r 0.0 two-pi Fcairo_arc drop
-				cairo Fcairo_fill drop
-				lx if
-					cairo lx ly Fcairo_move_to drop
-					cairo cx cy Fcairo_line_to drop
-					cairo Fcairo_stroke drop
-				then
-				cx to lx
-				cy to ly
-			end-each
-			cairo Fcairo_pop_group_to_source drop
-			cairo Fcairo_paint drop
-			cairo free-cairo drop
-		then
-	;
-[then]
+: xe-redraw { xe -- }
+	xe xe-drawer@ { drawer }
+	drawer is-managed?
+	xe xe-py0@ xe xe-py1@ > && if
+		xe xe-gcs@ { gc }
+		drawer FXtDisplay { dpy }
+		drawer FXtWindow { win }
+		dpy win FXClearWindow drop
+		\ Motif's DRAW-AXES takes 6 optional arguments.
+		\ '( x0 y0 x1 y1 ) = draw-axes(wid gc label
+		\                        x0=0.0 x1=1.0 y0=-1.0 y1=1.0
+		\                        style=x-axis-in-seconds
+		\                        axes=show-all-axes)
+		\ arity #( 3 6 #f )
+		drawer gc xe xe-name@
+		    xe xe-bx0@ xe xe-bx1@ xe xe-by0@ xe xe-by1@
+		    x-axis-in-seconds show-all-axes draw-axes drop
+		#f #f { lx ly }
+		10 { mouse-d }
+		5  { mouse-r }
+		xe each { point }
+			xe point 0 array-ref grfx { cx }
+			xe point 1 array-ref grfy { cy }
+			dpy win gc cx mouse-r - cy mouse-r -
+			    mouse-d mouse-d 0 360*64 FXFillArc drop
+			lx if
+				dpy win gc lx ly cx cy FXDrawLine drop
+			then
+			cx to lx
+			cy to ly
+		end-each
+	then
+;
 
 : add-envelope-point { xe x y -- }
 	xe xe-mouse-pos@ { mpos }
@@ -465,157 +408,64 @@ hide
 	xe xe-redraw
 ;
 
-'snd-motif provided? [if]
-	: draw-axes-cb <{ w xe info -- }>
-		xe xe-drawer@ xe xe-gcs@ xe xe-name@
-		    xe xe-bx0@ xe xe-bx1@ xe xe-by0@
-		    x-axis-in-seconds show-all-axes draw-axes
-		    xe draw-axes-set-points
-	;
+: draw-axes-cb <{ w xe info -- }>
+	xe xe-drawer@ xe xe-gcs@ xe xe-name@
+	    xe xe-bx0@ xe xe-bx1@ xe xe-by0@
+	    x-axis-in-seconds show-all-axes draw-axes
+	    xe draw-axes-set-points
+;
 
-	: mouse-press-cb <{ w xe ev f -- }>
-		xe ev Fx ev Fy mouse-press
-	;
+: mouse-press-cb <{ w xe ev f -- }>
+	xe ev Fx ev Fy mouse-press
+;
 
-	: mouse-release-cb <{ w xe ev f -- }>
-		xe mouse-release
-	;
+: mouse-release-cb <{ w xe ev f -- }>
+	xe mouse-release
+;
 
-	: mouse-drag-cb <{ w xe ev f -- }>
-		xe ev Fx ev Fy mouse-drag
-	;
+: mouse-drag-cb <{ w xe ev f -- }>
+	xe ev Fx ev Fy mouse-drag
+;
 
-	: define-cursor-cb <{ w xe ev f -- x }>
-		w FXtDisplay w FXtWindow xe FXDefineCursor
-	;
+: define-cursor-cb <{ w xe ev f -- x }>
+	w FXtDisplay w FXtWindow xe FXDefineCursor
+;
 
-	: undefine-cursor-cb <{ w xe ev f -- x }>
-		w FXtDisplay w FXtWindow FXUndefineCursor
-	;
+: undefine-cursor-cb <{ w xe ev f -- x }>
+	w FXtDisplay w FXtWindow FXUndefineCursor
+;
 
-	: make-drawer { name parent args -- drawer }
-		args FXmNbackground array-member? unless
-			args FXmNbackground array-push graph-color
-			    array-push to args
-		then
-		args FXmNforeground array-member? unless
-			args FXmNforeground array-push data-color
-			    array-push to args
-		then
-		parent name args FXmVaCreateManagedDrawingArea ( drawer )
-	;
-  
-	: init-xenved-cbs { xe -- }
-		xe xe-drawer@ { drawer }
-		drawer FXtDisplay FXC_crosshair
-		    FXCreateFontCursor { arrow-cursor }
-		drawer FXmNresizeCallback <'> draw-axes-cb xe
-		    FXtAddCallback drop
-		drawer FXmNexposeCallback <'> draw-axes-cb xe
-		    FXtAddCallback drop
-		drawer FButtonPressMask #f <'> mouse-press-cb xe
-		    FXtAddEventHandler drop
-		drawer FButtonReleaseMask #f <'> mouse-release-cb xe
-		    FXtAddEventHandler drop
-		drawer FButtonMotionMask #f <'> mouse-drag-cb xe
-		    FXtAddEventHandler drop
-		drawer FEnterWindowMask #f <'> define-cursor-cb arrow-cursor
-		    FXtAddEventHandler drop
-		drawer FLeaveWindowMask #f <'> undefine-cursor-cb #f
-		    FXtAddEventHandler drop
-	;
-[else]
-	: draw-axes-cb <{ w ev xe -- f }>
-		xe xe-drawer@ { win }
-		win make-cairo { cairo }
-		win xe xe-gcs@ xe xe-name@ xe xe-bx0@ xe xe-bx1@
-		    xe xe-by0@ xe xe-by1@ x-axis-in-seconds show-all-axes
-		    cairo draw-axes xe draw-axes-set-points
-		cairo free-cairo drop
-		#f
-	;
+: make-drawer { name parent args -- drawer }
+	args FXmNbackground array-member? unless
+		args FXmNbackground array-push graph-color
+		    array-push to args
+	then
+	args FXmNforeground array-member? unless
+		args FXmNforeground array-push data-color
+		    array-push to args
+	then
+	parent name args FXmVaCreateManagedDrawingArea ( drawer )
+;
 
-	\ '( bool x y ) = 
-	\     gdk_event_get_coords(event x-win-return=undef y-win-return=undef)
-	\ arity #( 1 2 #f )
-	: get-coords ( ev -- x y )
-		undef undef Fgdk_event_get_coords dup	\ coords coords
-		    1 array-ref swap	\ x coords
-		    2 array-ref		\ x y
-	;
-
-	: mouse-press-cb <{ w ev xe -- f }>
-		xe #t xe-dragging!
-		xe ev FGDK_EVENT get-coords mouse-press
-		#f
-	;
-
-	: mouse-release-cb <{ w ev xe -- f }>
-		xe #f xe-dragging!
-		xe mouse-release
-		#f
-	;
-
-	: mouse-drag-cb <{ w ev xe -- f }>
-		xe xe-dragging@ if
-			xe ev FGDK_EVENT get-coords mouse-drag
-		then
-		#f
-	;
-
-	: define-cursor-cb <{ w ev cursor -- f }>
-		w Fgtk_widget_get_window cursor Fgdk_window_set_cursor drop
-		#f
-	;
-
-	: make-drawer { name parent args -- drawer }
-		Fgtk_drawing_area_new { drawer }
-		drawer FGDK_ALL_EVENTS_MASK Fgtk_widget_set_events drop
-		parent FGTK_BOX drawer #t #t 10 Fgtk_box_pack_start drop
-		drawer Fgtk_widget_show drop
-		drawer name Fgtk_widget_set_name drop
-		drawer -1 200 Fgtk_widget_set_size_request drop
-		drawer
-	;
-
-	: init-xenved-cbs { xe -- }
-		xe xe-drawer@ { drawer }
-		drawer FGPOINTER
-		'gtk3 provided? if
-			"draw"
-		else
-			"expose_event"
-		then drawer FG_OBJECT FG_OBJECT_TYPE Fg_signal_lookup 0
-		    <'> draw-axes-cb xe #f Fg_cclosure_new #f
-		    Fg_signal_connect_closure_by_id drop
-		drawer FGPOINTER "configure_event"
-		    drawer FG_OBJECT FG_OBJECT_TYPE Fg_signal_lookup 0
-		    <'> draw-axes-cb xe #f Fg_cclosure_new #f
-		    Fg_signal_connect_closure_by_id drop
-		drawer FGPOINTER "button_press_event"
-		    drawer FG_OBJECT FG_OBJECT_TYPE Fg_signal_lookup 0
-		    <'> mouse-press-cb xe #f Fg_cclosure_new #f
-		    Fg_signal_connect_closure_by_id drop
-		drawer FGPOINTER "button_release_event"
-		    drawer FG_OBJECT FG_OBJECT_TYPE Fg_signal_lookup 0
-		    <'> mouse-release-cb xe #f Fg_cclosure_new #f
-		    Fg_signal_connect_closure_by_id drop
-		drawer FGPOINTER "motion_notify_event"
-		    drawer FG_OBJECT FG_OBJECT_TYPE Fg_signal_lookup 0
-		    <'> mouse-drag-cb xe #f Fg_cclosure_new #f
-		    Fg_signal_connect_closure_by_id drop
-		drawer FGPOINTER "enter_notify_event"
-		    drawer FG_OBJECT FG_OBJECT_TYPE Fg_signal_lookup 0
-		    <'> define-cursor-cb
-		    FGDK_CROSSHAIR Fgdk_cursor_new ( arrow-cursor )
-		    #f Fg_cclosure_new #f Fg_signal_connect_closure_by_id drop
-		drawer FGPOINTER "leave_notify_event"
-		    drawer FG_OBJECT FG_OBJECT_TYPE Fg_signal_lookup 0
-		    <'> define-cursor-cb
-		    FGDK_LEFT_PTR Fgdk_cursor_new ( old-cursor )
-		    #f Fg_cclosure_new #f Fg_signal_connect_closure_by_id drop
-	;
-[then]
+: init-xenved-cbs { xe -- }
+	xe xe-drawer@ { drawer }
+	drawer FXtDisplay FXC_crosshair
+	    FXCreateFontCursor { arrow-cursor }
+	drawer FXmNresizeCallback <'> draw-axes-cb xe
+	    FXtAddCallback drop
+	drawer FXmNexposeCallback <'> draw-axes-cb xe
+	    FXtAddCallback drop
+	drawer FButtonPressMask #f <'> mouse-press-cb xe
+	    FXtAddEventHandler drop
+	drawer FButtonReleaseMask #f <'> mouse-release-cb xe
+	    FXtAddEventHandler drop
+	drawer FButtonMotionMask #f <'> mouse-drag-cb xe
+	    FXtAddEventHandler drop
+	drawer FEnterWindowMask #f <'> define-cursor-cb arrow-cursor
+	    FXtAddEventHandler drop
+	drawer FLeaveWindowMask #f <'> undefine-cursor-cb #f
+	    FXtAddEventHandler drop
+;
 set-current
 
 : make-xenved <{ name parent
@@ -703,14 +553,12 @@ previous
 #f value test-widget-args
 #f value test-xenved-args
 
-'snd-motif provided? [if]
-  FxmFormWidgetClass  to test-widget-type
-  #( FXmNheight 200 ) to test-widget-args
-  #( FXmNleftAttachment   FXmATTACH_WIDGET
-     FXmNtopAttachment    FXmATTACH_WIDGET
-     FXmNbottomAttachment FXmATTACH_WIDGET
-     FXmNrightAttachment  FXmATTACH_WIDGET ) to test-xenved-args
-[then]
+FxmFormWidgetClass  to test-widget-type
+#( FXmNheight 200 ) to test-widget-args
+#( FXmNleftAttachment   FXmATTACH_WIDGET
+   FXmNtopAttachment    FXmATTACH_WIDGET
+   FXmNbottomAttachment FXmATTACH_WIDGET
+   FXmNrightAttachment  FXmATTACH_WIDGET ) to test-xenved-args
 
 : xenved-test <{ :optional name "xenved" -- xe }>
 	doc" create a drawing test widget\n\

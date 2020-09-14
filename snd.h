@@ -34,11 +34,7 @@
 #ifdef USE_MOTIF
   #include "snd-x0.h"
 #else
-  #if USE_GTK
-    #include "snd-g0.h"
-  #else
-    #include "snd-nogui0.h"
-  #endif
+  #include "snd-nogui0.h"
 #endif
 
 #include "snd-1.h"
@@ -46,20 +42,16 @@
 #ifdef USE_MOTIF
   #include "snd-x1.h"
 #else
-  #if USE_GTK
-    #include "snd-g1.h"
-  #else
-    #include "snd-nogui1.h"
-  #endif
+  #include "snd-nogui1.h"
 #endif
 
 #include "snd-strings.h"
 
-#define SND_DATE "7-Aug-20"
+#define SND_DATE "14-Sep-20"
 #ifndef SND_VERSION
-#define SND_VERSION "20.7"
+#define SND_VERSION "20.8"
 #endif
 #define SND_MAJOR_VERSION "20"
-#define SND_MINOR_VERSION "7"
+#define SND_MINOR_VERSION "8"
 
 #endif

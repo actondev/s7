@@ -78,7 +78,6 @@ static const char *main_snd_xrefs[16] = {
   "{Sndlib}: underlying sound support library",
   "{Scripting}: Snd with no GUI",
   "{Motif}: Motif extensions",
-  "{Gtk}: Gtk extensions",
   "{Ladspa}: plugins",
   "{Multiprecision arithmetic}: libgmp and friends",
   NULL
@@ -95,7 +94,6 @@ static const char *main_snd_xref_urls[16] = {
   "sndlib.html#introduction",
   "grfsnd.html#sndwithnogui",
   "grfsnd.html#sndwithmotif",
-  "grfsnd.html#sndwithgtk",  
   "grfsnd.html#sndandladspa",
   "grfsnd.html#sndandgmp",
   NULL,
@@ -146,10 +144,6 @@ static char *xm_version(void)
 #if HAVE_SCHEME
   #if USE_MOTIF
     xm_val = Xen_eval_C_string("(and (defined? 'xm-version) xm-version)");
-  #else
-    #if USE_GTK
-      xm_val = Xen_eval_C_string("(and (defined? 'xg-version) xg-version)");
-    #endif
   #endif
 #endif
 
@@ -161,11 +155,6 @@ static char *xm_version(void)
   #if USE_MOTIF
       if (rb_const_defined(rb_cObject, rb_intern("Xm_Version")))
 	xm_val = Xen_eval_C_string("Xm_Version");
-  #else
-    #if USE_GTK
-      if (rb_const_defined(rb_cObject, rb_intern("Xg_Version")))
-        xm_val = Xen_eval_C_string("Xg_Version");
-    #endif
   #endif
 #endif
 
@@ -250,24 +239,7 @@ static char *glx_version(void)
   if (snd_itoa_ctr < snd_itoa_size) snd_itoa_strs[snd_itoa_ctr++] = version;
   return(version);
 #else
-#if USE_GTK && (0)
-  /* TODO: need to gdk_gl_context_make_current then gdk_gl_context_get_version or better gtk_gl_area_make_current
-   */
-  #define VERSION_SIZE 128
-  char *version = NULL;
-  int major, minor;
-
-  if ((!ss->dialogs) || (!(main_display(ss)))) /* TODO: main_display needs to be the gl context here (it's not otherwise used in gtk snd) */
-    return(mus_strdup(" "));
-
-  version = (char *)calloc(VERSION_SIZE, sizeof(char));
-  gdk_gl_context_get_version(main_display(ss), &major, &minor);
-  snprintf(version, VERSION_SIZE, " %d.%d", major, minor);
-  if (snd_itoa_ctr < snd_itoa_size) snd_itoa_strs[snd_itoa_ctr++] = version;
-  return(version);
-#else
   return(mus_strdup(" "));
-#endif
 #endif
 }
 #endif
@@ -323,24 +295,6 @@ char *version_info(void)
 	  " X", snd_itoa(X_PROTOCOL), "R", 
                 snd_itoa(XT_REVISION),
 #endif
-#if USE_GTK
-	  "\n    Gtk+ ", snd_itoa(GTK_MAJOR_VERSION), ".", 
-                         snd_itoa(GTK_MINOR_VERSION), ".", 
-                         snd_itoa(GTK_MICRO_VERSION),
-	  ", Glib ",     snd_itoa(GLIB_MAJOR_VERSION), ".", 
-                         snd_itoa(GLIB_MINOR_VERSION), ".", 
-                         snd_itoa(GLIB_MICRO_VERSION),
-  #ifdef PANGO_VERSION_MAJOR
-	  ", Pango ", snd_itoa(PANGO_VERSION_MAJOR), ".",
-	              snd_itoa(PANGO_VERSION_MINOR), ".", 
-                      snd_itoa(PANGO_VERSION_MICRO),
-  #endif
-  #ifdef CAIRO_VERSION_MAJOR
-	  ", Cairo ", snd_itoa(CAIRO_VERSION_MAJOR), ".",
-	              snd_itoa(CAIRO_VERSION_MINOR), ".", 
-                      snd_itoa(CAIRO_VERSION_MICRO),
-  #endif
-#endif
 	  xm_version(), /* omitted if --version/--help because the init procs haven't run at that point */
 #if HAVE_GL
 	  "\n    OpenGL", glx_version(),
@@ -349,7 +303,7 @@ char *version_info(void)
           ", ", gl2ps_name = gl2ps_version(),
   #endif
 #endif
-#if (!USE_MOTIF) && (!USE_GTK)
+#if (!USE_MOTIF)
 	  "\n    no graphics",
 #endif
 #if USE_MOTIF
@@ -547,7 +501,7 @@ the searching mechanisms are disabled.",
 		      snd_xrefs("Search"),
 		      snd_xref_urls("Search"));
 
-  append_key_help("C-s", snd_K_s, snd_ControlMask, false, true);
+  append_key_help("C-s", snd_K_s, ControlMask, false, true);
 }
 
 
@@ -625,10 +579,10 @@ File:Revert is the same as undo all edits.",
 		      snd_xrefs("Undo"),
 		      snd_xref_urls("Undo"));
 
-  append_key_help("C-M-g", snd_K_g, snd_ControlMask | snd_MetaMask, false,
-    append_key_help("C-_", snd_K_underscore, snd_ControlMask, false,
-      append_key_help("C-x C-u", snd_K_u, snd_ControlMask, true,
-        append_key_help("C-x C-r", snd_K_r, snd_ControlMask, true,
+  append_key_help("C-M-g", snd_K_g, ControlMask | MetaMask, false,
+    append_key_help("C-_", snd_K_underscore, ControlMask, false,
+      append_key_help("C-x C-u", snd_K_u, ControlMask, true,
+        append_key_help("C-x C-r", snd_K_r, ControlMask, true,
           append_key_help("C-x u", snd_K_u, 0, true,
 	    append_key_help("C-x r", snd_K_r, 0, true, true))))));
 }
@@ -1079,8 +1033,8 @@ is displayed in blue.  The filter is on only if the filter button is set.",
 
   global_control_panel_state();
 
-  append_key_help("C-x C-o", snd_K_o, snd_ControlMask, true,
-    append_key_help("C-x C-c", snd_K_c, snd_ControlMask, true, true));
+  append_key_help("C-x C-o", snd_K_o, ControlMask, true,
+    append_key_help("C-x C-c", snd_K_c, ControlMask, true, true));
 }
 
 
@@ -1162,10 +1116,10 @@ The following keyboard commands relate to marks: \
 		      snd_xrefs("Mark"),
 		      snd_xref_urls("Mark"));
 
-  append_key_help("C-x C-m", snd_K_m, snd_ControlMask, true,
+  append_key_help("C-x C-m", snd_K_m, ControlMask, true,
     append_key_help("C-x /", snd_K_slash, 0, true,
-      append_key_help("C-j", snd_K_j, snd_ControlMask, false,
-        append_key_help("C-m", snd_K_m, snd_ControlMask, false, true))));
+      append_key_help("C-j", snd_K_j, ControlMask, false,
+        append_key_help("C-m", snd_K_m, ControlMask, false, true))));
 }
 
 
@@ -1272,7 +1226,7 @@ and amplitude envelope applied to the mix. \
 		      snd_xref_urls("Mix"));
 
   append_key_help("C-x q", snd_K_q, 0, true,
-    append_key_help("C-x C-q", snd_K_q, snd_ControlMask, true, true));
+    append_key_help("C-x C-q", snd_K_q, ControlMask, true, true));
 }
 
 
@@ -1420,7 +1374,7 @@ static bool find_unbuckified_keys(int key, int state, bool cx, Xen func)
 
 static bool find_buckified_keys(int key, int state, bool cx, Xen func)
 {
-  if ((key > 256) && (state == snd_ControlMask) && (!cx) && (Xen_is_bound(func)))
+  if ((key > 256) && (state == ControlMask) && (!cx) && (Xen_is_bound(func)))
     show_key_help(key, state, cx, key_description(key, state, cx));
   return(false);
 }
@@ -1436,7 +1390,7 @@ static bool find_unbuckified_cx_keys(int key, int state, bool cx, Xen func)
 
 static bool find_buckified_cx_keys(int key, int state, bool cx, Xen func)
 {
-  if ((key > 256) && (state == snd_ControlMask) && (cx) && (Xen_is_bound(func)))
+  if ((key > 256) && (state == ControlMask) && (cx) && (Xen_is_bound(func)))
     show_key_help(key, state, cx, key_description(key, state, cx));
   return(false);
 }
@@ -1444,7 +1398,7 @@ static bool find_buckified_cx_keys(int key, int state, bool cx, Xen func)
 
 static bool find_leftover_keys(int key, int state, bool cx, Xen func)
 {
-  if ((key > 256) && (state & snd_MetaMask))
+  if ((key > 256) && (state & MetaMask))
     show_key_help(key, state, cx, key_description(key, state, cx));
   return(false);
 }
@@ -1488,17 +1442,17 @@ any key via:\n\
     show_key_help(i, 0, false, key_description(i, 0, false));
   map_over_keys(find_unbuckified_keys);
   for (i = 0; i < 256; i++)
-    show_key_help(i, snd_ControlMask, false, key_description(i, snd_ControlMask, false));
+    show_key_help(i, ControlMask, false, key_description(i, ControlMask, false));
   map_over_keys(find_buckified_keys);
   for (i = 0; i < 256; i++)
-    show_key_help(i, snd_MetaMask, false, key_description(i, snd_MetaMask, false));
+    show_key_help(i, MetaMask, false, key_description(i, MetaMask, false));
   for (i = 0; i < 256; i++)
-    show_key_help(i, snd_ControlMask | snd_MetaMask, false, key_description(i, snd_ControlMask | snd_MetaMask, false));
+    show_key_help(i, ControlMask | MetaMask, false, key_description(i, ControlMask | MetaMask, false));
   for (i = 0; i < 256; i++)
     show_key_help(i, 0, true, key_description(i, 0, true));
   map_over_keys(find_unbuckified_cx_keys);
   for (i = 0; i < 256; i++)
-    show_key_help(i, snd_ControlMask, true, key_description(i, snd_ControlMask, true));
+    show_key_help(i, ControlMask, true, key_description(i, ControlMask, true));
 
   map_over_keys(find_buckified_cx_keys);
   map_over_keys(find_leftover_keys);
@@ -1569,7 +1523,7 @@ Except in the browsers, what is actually played depends on the control panel.",
 		      snd_xrefs("Play"),
 		      snd_xref_urls("Play"));
 
-  append_key_help("C-q", snd_K_q, snd_ControlMask, true, true);
+  append_key_help("C-q", snd_K_q, ControlMask, true, true);
 #else
   snd_help("Play", "this version of Snd can't play!", WITH_WORD_WRAP);
 #endif
@@ -1654,7 +1608,7 @@ command is C-x C-s (save). ",
 		      snd_xrefs("Save"),
 		      snd_xref_urls("Save"));
 
-  append_key_help("C-x C-s", snd_K_s, snd_ControlMask, true, true);
+  append_key_help("C-x C-s", snd_K_s, ControlMask, true, true);
 }
 
 
@@ -1862,7 +1816,7 @@ zero sample at the cursor.  There are also the File:Insert and Edit:Insert Selec
 		      snd_xrefs("Insert"),
 		      snd_xref_urls("Insert"));
 
-  append_key_help("C-o", snd_K_o, snd_ControlMask, false, true);
+  append_key_help("C-o", snd_K_o, ControlMask, false, true);
 }
 
 
@@ -1893,8 +1847,8 @@ functions are:\n\
 		      snd_xrefs("Delete"),
 		      snd_xref_urls("Delete"));
 
-  append_key_help("C-w", snd_K_w, snd_ControlMask, false,
-    append_key_help("C-d", snd_K_d, snd_ControlMask, false, true));
+  append_key_help("C-w", snd_K_w, ControlMask, false,
+    append_key_help("C-d", snd_K_d, ControlMask, false, true));
 }
 
 
@@ -1989,7 +1943,7 @@ continue the definition.",
 		      snd_xrefs("Region"),
 		      snd_xref_urls("Region"));
 
-  append_key_help("C-[space]", snd_K_space, snd_ControlMask, false, true);
+  append_key_help("C-[space]", snd_K_space, ControlMask, false, true);
 }
 
 
@@ -2425,7 +2379,7 @@ void open_file_dialog_help(void)
 #if USE_MOTIF
   snd_help_with_xrefs("Open File",
 
-"The file selection dialog is slightly different from the Gtk or Motif default.  If you single click \
+"The file selection dialog is slightly different from the Motif default.  If you single click \
 in the directory list, that directory is immediately opened and displayed.  Also there are \
 two popup menus to set the \
 current sort routine (right click over the file list), and jump to a higher level directory (right click \
@@ -2817,12 +2771,12 @@ static void window_size_help(void)
 
 #include "snd-xref.c"
 
-#define NUM_TOPICS 37
+#define NUM_TOPICS 36
 static const char *topic_names[NUM_TOPICS] = {
   "Hook", S_Vct, "Sample reader", "Mark", "Mix", "Region", "Edit list", "Transform", "Error",
   "Color", "Font", "Graphic", "Widget", "Emacs",
   "CLM", "Instrument", "CM", "CMN", "Sndlib", 
-  "Motif", "Gtk", "Script", "Ruby", "s7", "LADSPA", "OpenGL", "Gdb", "Control panel",
+  "Motif", "Script", "Ruby", "s7", "LADSPA", "OpenGL", "Gdb", "Control panel",
   "X resources", "Invocation flags", "Initialization file", "Customization",
   "Window Size", "Color", "Random Number", "Wavogram",
   "Forth"
@@ -2835,7 +2789,7 @@ static const char *topic_urls[NUM_TOPICS] = {
   "extsnd.html#sndwidgets", "grfsnd.html#emacssnd", "grfsnd.html#sndwithclm", 
   "grfsnd.html#sndinstruments", "grfsnd.html#sndwithcm", "sndscm.html#musglyphs", 
   "sndlib.html#introduction", "grfsnd.html#sndwithmotif", 
-  "grfsnd.html#sndwithgtk", "grfsnd.html#sndwithnogui", "grfsnd.html#sndandruby", "grfsnd.html#sndands7", 
+  "grfsnd.html#sndwithnogui", "grfsnd.html#sndandruby", "grfsnd.html#sndands7", 
   "grfsnd.html#sndandladspa", 
   "grfsnd.html#sndandgl", "grfsnd.html#sndandgdb", "extsnd.html#customcontrols",
   "grfsnd.html#sndresources", "grfsnd.html#sndswitches", "grfsnd.html#sndinitfile", "extsnd.html#extsndcontents",
@@ -3686,14 +3640,12 @@ and its value is returned."
 	      free(str);
 	      str = NULL;
 	    }
-#if (!USE_GTK)
 	  if (widget_wid > 0)
 	    {
 	      str = word_wrap(new_str, widget_wid);
 	      if (new_str) free(new_str);
 	    }
 	  else 
-#endif
 	    str = new_str;
 	  help_text = C_string_to_Xen_string(str);
 	  if (str) free(str);
