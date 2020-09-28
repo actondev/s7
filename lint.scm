@@ -6982,12 +6982,15 @@
 
 		(when (eq? head 'car)                             
 		  (case (car arg) 
-		    ((list-tail)                   ; (car (list-tail x y)) -> (list-ref x y)
+		    ((list-tail)                      ; (car (list-tail x y)) -> (list-ref x y)
 		     (if (len=3? arg)
 			 (lint-format "perhaps ~A" caller (lists->string form (list 'list-ref (cadr arg) (caddr arg))))))
 
-		    ((list)                        ; (car (list x ...)) -> x, (car (list)) is handled elsewhere, (car (cons...)) is below
-		     (lint-format "perhaps ~A" caller (lists->string form (cadr arg))))
+		    ((list)                           ; (car (list x ...)) -> x, (car (list)) is handled elsewhere, (car (cons...)) is below
+		     (unless (and (pair? (cdr arg))
+				  (pair? (cadr arg))  ; (car (list (eval ...))) to catch first of mv
+				  (memq (caadr arg) '(eval-string eval apply values))) ; actually any closure here might return multiple values
+		       (lint-format "perhaps ~A" caller (lists->string form (cadr arg)))))
 
 		    ((append)                      ; (car (append x ...)) -> (car x)
 		     (lint-format "perhaps ~A" caller (lists->string form (list 'car (cadr arg)))))
@@ -7573,6 +7576,10 @@
 									   (caddr arg)
 									   (cons '+ (cddr arg)))))))))
 			      
+			      ((abs magnitude)          ; (zero? (abs x)) -> (zero? x)
+			       (if (eq? head 'zero?)
+				   (lint-format "perhaps ~A" caller (lists->string form (cons 'zero? (cdr arg))))))
+
 			      ((numerator)              ; (negative? (numerator x)) -> (negative? x)
 			       (lint-format "perhaps ~A" caller (lists->string form (list head (cadr arg)))))
 			      
@@ -7650,12 +7657,10 @@
 	(let ()
 	  (define (sp-string-copy caller head form env)
 	    (if (pair? (cdr form))
-		(if (pair? (cddr form)) ; s7 string-copy does not have start/end indices (unlike r7rs)
-		    (lint-format "perhaps ~A" caller (lists->string form (cons 'substring (cdr form))))
-		    (if (and (pair? (cadr form))   ; (string-copy (string-copy x)) could be (string-copy x)
-			     (memq (caadr form) '(copy string-copy string make-string string-upcase string-downcase
-						       string-append list->string symbol->string number->string)))
-			(lint-format "~A could be ~A" caller (truncated-list->string form) (cadr form))))))
+		(if (and (pair? (cadr form))   ; (string-copy (string-copy x)) could be (string-copy x)
+			 (memq (caadr form) '(copy string-copy string make-string string-upcase string-downcase
+						   string-append list->string symbol->string number->string)))
+		    (lint-format "~A could be ~A" caller (truncated-list->string form) (cadr form)))))
 	  (hash-special 'string-copy sp-string-copy))
 	
 	;; ---------------- string-down|upcase ----------------
