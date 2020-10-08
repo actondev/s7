@@ -1,0 +1,5 @@
+# notcurses not available in ubuntu 20.04, so..
+[wrap-git]
+ url =  https://github.com/dankamongmen/notcurses.git
+ revision = v1.7.5
+# depth = 1

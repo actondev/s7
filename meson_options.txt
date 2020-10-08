@@ -1,0 +1,2 @@
+option('nrepl', type : 'boolean', value : false,
+       description : 'Building nrepl. Requires the notcurses cmake subproject. Also, a mod in nrepl.c, see meson.build file for more info')

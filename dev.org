@@ -1,0 +1,65 @@
+* Merging gitlab master
+  master is now in [[https://cm-gitlab.stanford.edu/bil/s7][gitlab]], with fresh git history. So, to merge:
+  #+BEGIN_SRC sh
+git merge --allow-unrelated-histories master feature/meson -Xtheirs
+  #+END_SRC
+
+  after this first merge, later on it's fairly simple
+
+* Building
+
+  #+BEGIN_SRC sh
+meson setup build
+meson configure build | grep optimization
+meson configure build -Doptimization=2 # speed
+meson configure build -Doptimization=s # size
+
+ninja -C build
+
+# simple benchmark : takes 3.5-4s in my machine
+build/repl fib41.scm
+  #+END_SRC
+** Building nrepl, notcurses
+  First, requirments
+  #+BEGIN_SRC sh
+# sudo apt-get install libncurses-dev # needed for nrepl
+# .. not really.. it's "notcurses" not "ncurses" ugh..
+sudo apt-get install libavcodec-dev libavformat-dev libswscale-dev libunistring-dev # needed from notcurses
+# or maybe set USE_MULTIMEDIA to none.. anyway
+
+apt-cache search libunistring
+  #+END_SRC
+
+   Ignoring for now
+
+   notcurses with cmake module
+   #+BEGIN_SRC sh
+apt-cache search notcurses
+locate notcurses.h
+locate ncurses.h
+
+locate glob.h
+locate cdefs.h
+locate stdio.h # /usr/include/stdio.h
+   #+END_SRC
+
+   #+BEGIN_QUOTE
+   nrepl.c:273:88: error: ‘GLOB_TILDE’ undeclared (first use in this function)
+  273 |   s7_define(sc, cur_env, s7_make_symbol(sc, "GLOB_TILDE"), s7_make_integer(sc, (s7_int)GLOB_TILDE));
+   #+END_QUOTE
+
+   glob.h
+   #+BEGIN_SRC c
+#if !defined __USE_POSIX2 || defined __USE_MISC
+# define GLOB_TILDE	 (1 << 12)/* Expand ~user and ~ to home directories. */
+#endif
+   #+END_SRC
+
+   one of
+   #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+ undefines? __USE_MISC
+
+ stdio.h
