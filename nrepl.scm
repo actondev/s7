@@ -12,7 +12,7 @@
 (unless (defined? '*notcurses*)          ; nrepl.c has notcurses_s7.c (thus *notcurses*) built-in
   (load "notcurses_s7.so" (inlet 'init_func 'notcurses_s7_init)))
 
-(unless (string=? (notcurses_version) "1.6.19")
+(unless (string=? (notcurses_version) "1.7.2")
   (define ncdirect_fg ncdirect_fg_rgb)
   (define ncdirect_bg ncdirect_bg_rgb))
 
@@ -26,8 +26,7 @@
   (set! (debug-repl) 
 	drop-into-repl)
   (set! (debug-port)
-	(open-output-function (lambda (cint) 
-				(display-debug-info cint))))
+	(open-output-function display-debug-info))
   (set! (hook-functions ((funclet trace-in) '*debug-unwatch-hook*))
 	(list (lambda (h)
 		(remove-watcher (h 'var))))))
