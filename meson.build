@@ -13,11 +13,27 @@ configure_file(input : 'mus-config.h.in',
 # configure_file(configuration: configuration_data(),
 #                output : 'mus-config.h')
 
-# todo windows
+system = host_machine.system()
+compiler_id = meson.get_compiler('cpp').get_id()
+# link_args = []
+# if system == 'linux'
+#   link_args = [
+#   '-lm', # log, ceil etc
+#   # '-ldl', # dlopen etc
+#   ]
+# elif system == 'windows'
+#   # msvc vs gcc ??
+#   if compiler_id == 'gcc'
+#     link_args = [
+#       '-lm', # log, ceil etc
+#     ]
+#   endif
+# endif
+# linux mingw?
+
 link_args = [
-  '-lm', # log, ceil etc
-  '-ldl', # dlopen etc
-]
+  '-lm', # math
+  ]
 
 s7 = library('s7',
 	     's7.c',

@@ -148,3 +148,6 @@
   #endif
 #endif
 #endif
+
+// linux mingw fix?
+#define WITH_C_LOADER 0
