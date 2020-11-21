@@ -176,6 +176,7 @@ static s7_pointer set_sigint_handler(s7_scheme *sc, s7_pointer args)
   sigemptyset(&new_action.sa_mask);
   new_action.sa_flags = SA_RESTART;
   sigaction(SIGINT, &new_action, NULL);
+  return(s7_f(sc));
 }
 
 void exit_sigint_handler(int signum)
@@ -193,28 +194,27 @@ static s7_pointer unset_sigint_handler(s7_scheme *sc, s7_pointer args)
   sigemptyset(&old_action.sa_mask);
   old_action.sa_flags = SA_RESTART;
   sigaction(SIGINT, &old_action, NULL);
+  return(s7_f(sc));
 }
 
 
 static void init_nlibc(s7_scheme *sc)
 {
-  s7_pointer cur_env, pl_tx, pcl_s, pl_ix, pcl_x, pcl_i, pl_ssix, pl_is, pl_xi, pcl_xi;
+  s7_pointer cur_env, pl_tx, pcl_s, pl_ix, pcl_x, pcl_i, pl_ssix, pl_is, pcl_xi;
   s7_int gc_loc;
 
   cur_env = s7_inlet(sc, s7_nil(sc));
   gc_loc = s7_gc_protect(sc, cur_env);
 
   {
-    s7_pointer t, x, s, d, i;
+    s7_pointer t, x, s, i;
     t = s7_t(sc);
     x = s7_make_symbol(sc, "c-pointer?");
     s = s7_make_symbol(sc, "string?");
-    d = s7_make_symbol(sc, "float?");
     i = s7_make_symbol(sc, "integer?");
 
     pcl_xi = s7_make_circular_signature(sc, 1, 2, x, i);
     pl_tx = s7_make_signature(sc, 2, t, x);
-    pl_xi = s7_make_signature(sc, 2, x, i);
     pl_ix = s7_make_signature(sc, 2, i, x);
     pcl_s = s7_make_circular_signature(sc, 0, 1, s);
     pcl_x = s7_make_circular_signature(sc, 0, 1, x);
@@ -292,6 +292,9 @@ static void init_nlibc(s7_scheme *sc)
   s7_gc_unprotect_at(sc, gc_loc);
 }
 
+#ifndef NREPL_DEBUGGING
+  #define NREPL_DEBUGGING USE_SND
+#endif
 
 #if (!USE_SND)
 int main(int argc, char **argv)
@@ -349,11 +352,41 @@ static int nrepl(s7_scheme *sc)
 #ifdef S7_LOAD_PATH
       s7_add_to_load_path(sc, S7_LOAD_PATH);
 #endif
+#if (!NREPL_DEBUGGING)
+      s7_add_to_load_path(sc, "/usr/local/share/s7");
+      #include "nrepl-bits.h"
+      s7_load_c_string(sc, (const char *)nrepl_scm, nrepl_scm_len);
+#else
       if (!s7_load(sc, "nrepl.scm"))
 	return(1);
-      s7_eval_c_string(sc, "((*nrepl* 'run))");
+#endif
 #endif
     }
   return(0);
 }
 
+#if 0
+/*
+  gcc -c s7.c -O2 -I. -Wl,-export-dynamic -lm -ldl
+  gcc -o nrepl nrepl.c s7.o -lnotcurses -lm -I. -ldl
+
+  To build s7 to nrepl in one line:
+    gcc -o nrepl s7.c -O2 -I. -Wl,-export-dynamic -lm -ldl -DWITH_MAIN -DWITH_NOTCURSES -lnotcurses
+
+  nrepl-bits.h is generated from (make-nrepl-bits.scm):
+
+(call-with-output-file "nrepl-bits.h"
+  (lambda (op)
+    (call-with-input-file "nrepl.scm"
+      (lambda (ip)
+	(format op "unsigned char nrepl_scm[] = {~%  ")
+	(do ((c (read-char ip) (read-char ip))
+	     (i 0 (+ i 1)))
+	    ((eof-object? c)
+	     (format op "0};~%unsigned int nrepl_scm_len = ~D;~%" i)) ; the C string length, not the array length
+	  (format op "0x~X, " (char->integer c))
+	  (if (char=? c #\newline)
+	      (format op "~%  ")))))))
+
+*/
+#endif

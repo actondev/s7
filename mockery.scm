@@ -63,9 +63,9 @@
 				new-args)))
 		  args)
 	(if unknown-openlets
-	    (apply func (reverse new-args))
+	    (apply func (reverse! new-args))
 	    (let-temporarily (((*s7* 'openlets) #f)) 
-	      (apply func (reverse new-args)))))))
+	      (apply func (reverse! new-args)))))))
 
   ;; one tricky thing here is that a mock object can be the let of with-let: (with-let (mock-port ...) ...)
   ;;   so a mock object's method can be called even when no argument is a mock object.  Even trickier
@@ -620,7 +620,6 @@
   ;; from Wikipedia:
   ;; x + y =	[a+c, b+d]
   ;; x - y =	[a-d, b-c]
-  ;; x × y =	[min(ac, ad, bc, bd), max(ac, ad, bc, bd)]
   ;; x / y =	[min(a/c, a/d, b/c, b/d), max(a/c, a/d, b/c, b/d)]
   
   (define *interval*

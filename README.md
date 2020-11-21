@@ -8,7 +8,7 @@ s7 is a Scheme interpreter.
 
 [daily tarball](https://ccrma.stanford.edu/software/s7/s7.tar.gz)
 
-[monthly tarball](https://ccrma.stanford.edu/software/s7/s7-6Sep20.tar.gz)
+[monthly tarball](https://ccrma.stanford.edu/software/s7/s7-2020-10-13.tar.gz)
 
 [mailing list](http://ccrma-mail.stanford.edu/mailman/listinfo/cmdist)
 
@@ -19,6 +19,8 @@ s7 is a Scheme interpreter.
 [scheme-for-max](https://github.com/iainctduncan/scheme-for-max) (Iain Duncan)
 
 [radium](https://users.notam02.no/~kjetism/radium/) (Kjetil Matheussen)
+
+[Common Music](http://commonmusic.sourceforge.net/) (Rick Taube)
 
 docker container: docker run -it schemers/s7:head (Lassi Kortela)
 

@@ -1,8 +1,7 @@
 /* s7 FFI for the notcurses library
  *
  *   Fedora: notcurses notcurses-devel notcurses-utils
- *   tested in 1.7.4 (fedora 33 via fedora-rawhide) -- this calls itself 1.7.5
- *          in fedora 32, they say 1.7.4, but I think it is 1.7.3, and we don't support that version
+ *   tested in fedora 32/33, Ubuntu 20.10
  */
 
 #include <locale.h>
@@ -10,17 +9,18 @@
 #include <notcurses/direct.h>
 #include "s7.h"
 
-/* notcurses does not export its version number */
-#ifndef NC_1_7_4
-  #define NC_1_7_4 1
-#endif
+/* notcurses included version.h only after version 2, so we can't depend on it */
+#define VERSION_2 0 /* set to 1 to get various version 2 changes */
 
+
+#if (!S7_MAIN)
 static s7_int s7_integer_checked(s7_scheme *sc, s7_pointer val)
 {
   if (!s7_is_integer(val))
     s7_wrong_type_arg_error(sc, __func__, 0, val, "an integer");
   return(s7_integer(val));
 }
+#endif
 
 static s7_double s7_real_checked(s7_scheme *sc, s7_pointer val)
 {
@@ -121,11 +121,13 @@ static s7_pointer g_ncdirect_init(s7_scheme *sc, s7_pointer args)
   uint64_t flags = 0;
   termtype = s7_car(args);
   if (s7_is_pair(s7_cdr(args)))
-    fp = (FILE *)s7_c_pointer_with_type(sc, s7_cadr(args), s7_make_symbol(sc, "FILE*"), __func__, 2);
+    {
+      fp = (FILE *)s7_c_pointer_with_type(sc, s7_cadr(args), s7_make_symbol(sc, "FILE*"), __func__, 2);
+      if (s7_is_pair(s7_cddr(args)))
+	flags = s7_integer_checked(sc, s7_caddr(args));
+    }
   else fp = stdout;
 
-  if (s7_is_pair(s7_cddr(args)))
-    flags = s7_integer_checked(sc, s7_caddr(args));
   if ((s7_is_c_pointer(termtype)) &&
       (s7_c_pointer(termtype) == NULL))
     return(s7_make_c_pointer_with_type(sc, ncdirect_init(NULL, fp, flags), ncdirect_symbol, s7_f(sc)));
@@ -597,13 +599,13 @@ static s7_pointer g_notcurses_drop_planes(s7_scheme *sc, s7_pointer args)
   return(s7_f(sc));
 }
 
-#if 0
 
+#if VERSION_2
 static s7_pointer g_notcurses_render_to_buffer(s7_scheme *sc, s7_pointer args)
 {
   return(s7_make_integer(sc, notcurses_render_to_buffer((struct notcurses *)s7_c_pointer_with_type(sc, s7_car(args), notcurses_symbol, __func__, 1),
-							(char **)s7_c_pointer(sc, s7_cadr(args)),
-							(size_t *)s7_c_pointer(sc, s7_caddr(args)))));
+							(char **)s7_c_pointer(s7_cadr(args)),
+							(size_t *)s7_c_pointer(s7_caddr(args)))));
 }
 
 static s7_pointer g_notcurses_stats_reset(s7_scheme *sc, s7_pointer args)
@@ -636,13 +638,13 @@ static s7_pointer g_ncstats_writeout_min_ns(s7_scheme *sc, s7_pointer args)
   return(s7_make_integer(sc, ((ncstats *)s7_c_pointer_with_type(sc, s7_car(args), ncstats_symbol, __func__, 1))->writeout_min_ns));
 }
 
-  nc_func(ncstats_writeout_ns, 1, 0, false);
-  nc_func(ncstats_writeout_max_ns, 1, 0, false);
-  nc_func(ncstats_writeout_min_ns, 1, 0, false);
-
-  nc_int(NCDIRECT_OPTION_INHIBIT_SETLOCALE);
-  nc_int(NCDIRECT_OPTION_INHIBIT_CBREAK);
-
+static s7_pointer g_ncmenu_item_set_status(s7_scheme *sc, s7_pointer args) 
+{
+  return(s7_make_integer(sc, ncmenu_item_set_status((struct ncmenu *)s7_c_pointer_with_type(sc, s7_car(args), ncmenu_symbol, __func__, 1),
+						    (const char *)s7_string(s7_cadr(args)),
+						    (const char *)s7_string(s7_caddr(args)),
+						    s7_boolean(sc, s7_cadddr(args)))));
+}
 #endif
 
 #if 0
@@ -945,13 +947,6 @@ static s7_pointer g_notcurses_stats(s7_scheme *sc, s7_pointer args)
   return(s7_cadr(args));
 }
 
-static s7_pointer g_notcurses_reset_stats(s7_scheme *sc, s7_pointer args)
-{
-  notcurses_reset_stats((struct notcurses *)s7_c_pointer_with_type(sc, s7_car(args), notcurses_symbol, __func__, 1), 
-			(ncstats *)s7_c_pointer_with_type(sc, s7_cadr(args), ncstats_symbol, __func__, 2));
-  return(s7_cadr(args));
-}
-
 
 /* -------- ncplane_options -------- */
 
@@ -1190,6 +1185,7 @@ static s7_pointer g_ncplane_set_bg_rgb(s7_scheme *sc, s7_pointer args)
 					    (unsigned)s7_integer_checked(sc, s7_cadr(args)))));
 }
 
+#if VERSION_2
 static s7_pointer g_ncplane_set_styles(s7_scheme *sc, s7_pointer args)
 {
   ncplane_set_styles((struct ncplane *)s7_c_pointer_with_type(sc, s7_car(args), ncplane_symbol, __func__, 1),
@@ -1210,6 +1206,7 @@ static s7_pointer g_ncplane_off_styles(s7_scheme *sc, s7_pointer args)
 		     (unsigned)s7_integer_checked(sc, s7_cadr(args)));
   return(s7_f(sc));
 }
+#endif
 
 static s7_pointer g_ncplane_set_fg_palindex(s7_scheme *sc, s7_pointer args)
 {
@@ -1599,19 +1596,25 @@ static s7_pointer g_ncplane_putstr_yx(s7_scheme *sc, s7_pointer args)
 					       (int)s7_integer_checked(sc, s7_cadr(args)), (int)s7_integer_checked(sc, s7_caddr(args)),
 					       (const char *)s7_string_checked(sc, s7_cadddr(args)))));
 }
-#if 0
+
+#if VERSION_2
 static s7_pointer g_ncplane_putnstr_aligned(s7_scheme *sc, s7_pointer args)
 {
   return(s7_make_integer(sc, ncplane_putnstr_aligned((struct ncplane *)s7_c_pointer_with_type(sc, s7_car(args), ncplane_symbol, __func__, 1), 
-						     (int)s7_integer_checked(sc, s7_cadr(args)), (ncalign_e)s7_integer_checked(sc, s7_caddr(args)),
-						     (size_t)s7_integer_checked(sc, s7_cadddr(args)), (const char *)s7_string_checked(sc, s7_car(s7_cdddr(args))))));
+						     (int)s7_integer_checked(sc, s7_cadr(args)), 
+						     (ncalign_e)s7_integer_checked(sc, s7_caddr(args)),
+						     (size_t)s7_integer_checked(sc, s7_cadddr(args)), 
+						     (const char *)s7_string_checked(sc, s7_cadr(s7_cdddr(args))))));
 }
 #endif
+
 static s7_pointer g_ncplane_putnstr_yx(s7_scheme *sc, s7_pointer args)
 {
   return(s7_make_integer(sc, ncplane_putnstr_yx((struct ncplane *)s7_c_pointer_with_type(sc, s7_car(args), ncplane_symbol, __func__, 1), 
-						(int)s7_integer_checked(sc, s7_cadr(args)), (int)s7_integer_checked(sc, s7_caddr(args)),
-						(size_t)s7_integer_checked(sc, s7_cadddr(args)), (const char *)s7_string_checked(sc, s7_car(s7_cdddr(args))))));
+						(int)s7_integer_checked(sc, s7_cadr(args)), 
+						(int)s7_integer_checked(sc, s7_caddr(args)),
+						(size_t)s7_integer_checked(sc, s7_cadddr(args)), 
+						(const char *)s7_string_checked(sc, s7_cadr(s7_cdddr(args))))));
 }
 
 static s7_pointer g_ncplane_putchar_stained(s7_scheme *sc, s7_pointer args)
@@ -2047,13 +2050,6 @@ static s7_pointer g_ncselector_options_items(s7_scheme *sc, s7_pointer args)
 				     ncselector_item_symbol, s7_f(sc)));
 }
 
-#if 0
-static s7_pointer g_ncselector_options_itemcount(s7_scheme *sc, s7_pointer args) 
-{
-  return(s7_make_integer(sc, ((ncselector_options *)s7_c_pointer_with_type(sc, s7_car(args), ncselector_options_symbol, __func__, 1))->itemcount));
-}
-#endif
-
 static s7_pointer g_ncselector_options_defidx(s7_scheme *sc, s7_pointer args) 
 {
   return(s7_make_integer(sc, ((ncselector_options *)s7_c_pointer_with_type(sc, s7_car(args), ncselector_options_symbol, __func__, 1))->defidx));
@@ -2150,16 +2146,6 @@ static s7_pointer g_set_ncselector_options_items(s7_scheme *sc, s7_pointer args)
   no->items = (struct ncselector_item *)s7_c_pointer_with_type(sc, s7_cadr(args), ncselector_item_symbol, __func__, 2);
   return(s7_cadr(args));
 }
-
-#if 0
-static s7_pointer g_set_ncselector_options_itemcount(s7_scheme *sc, s7_pointer args)
-{
-  ncselector_options *no;
-  no = (ncselector_options *)s7_c_pointer_with_type(sc, s7_car(args), ncselector_options_symbol, __func__, 1);
-  no->itemcount = (unsigned int)s7_integer_checked(sc, s7_cadr(args));
-  return(s7_cadr(args));
-}
-#endif
 
 static s7_pointer g_set_ncselector_options_maxdisplay(s7_scheme *sc, s7_pointer args)
 {
@@ -2338,13 +2324,6 @@ static s7_pointer g_ncmultiselector_options_items(s7_scheme *sc, s7_pointer args
   return(s7_make_c_pointer_with_type(sc, ((ncmultiselector_options *)s7_c_pointer_with_type(sc, s7_car(args), ncmultiselector_options_symbol, __func__, 1))->items, s7_make_symbol(sc, "ncmselector_items*"), s7_f(sc)));
 }
 
-#if 0
-static s7_pointer g_ncmultiselector_options_itemcount(s7_scheme *sc, s7_pointer args) 
-{
-  return(s7_make_integer(sc, ((ncmultiselector_options *)s7_c_pointer_with_type(sc, s7_car(args), ncmultiselector_options_symbol, __func__, 1))->itemcount));
-}
-#endif
-
 static s7_pointer g_ncmultiselector_options_maxdisplay(s7_scheme *sc, s7_pointer args) 
 {
   return(s7_make_integer(sc, ((ncmultiselector_options *)s7_c_pointer_with_type(sc, s7_car(args), ncmultiselector_options_symbol, __func__, 1))->maxdisplay));
@@ -2436,16 +2415,6 @@ static s7_pointer g_set_ncmultiselector_options_items(s7_scheme *sc, s7_pointer 
   no->items = (struct ncmselector_item *)s7_c_pointer_with_type(sc, s7_cadr(args), ncmselector_item_symbol, __func__, 2);
   return(s7_cadr(args));
 }
-
-#if 0
-static s7_pointer g_set_ncmultiselector_options_itemcount(s7_scheme *sc, s7_pointer args)
-{
-  ncmultiselector_options *no;
-  no = (ncmultiselector_options *)s7_c_pointer_with_type(sc, s7_car(args), ncmultiselector_options_symbol, __func__, 1);
-  no->itemcount = (unsigned int)s7_integer_checked(sc, s7_cadr(args));
-  return(s7_cadr(args));
-}
-#endif
 
 static s7_pointer g_set_ncmultiselector_options_maxdisplay(s7_scheme *sc, s7_pointer args)
 {
@@ -2591,8 +2560,8 @@ static s7_pointer g_list_to_ncmenu_items(s7_scheme *sc, s7_pointer args)
 {
   /* car = list of items (c_pointers) */
   int32_t i, len;
-  s7_pointer lst, items;
-  struct ncmenu_item *p, *pp;
+  s7_pointer lst;
+  struct ncmenu_item *p;
 
   lst = s7_car(args);
   len = s7_list_length(sc, lst);
@@ -2715,8 +2684,8 @@ static s7_pointer g_list_to_ncmenu_sections(s7_scheme *sc, s7_pointer args)
 {
   /* car = list of sections (c_pointers) */
   int32_t i, len;
-  s7_pointer lst, items;
-  struct ncmenu_section *p, *pp;
+  s7_pointer lst;
+  struct ncmenu_section *p;
 
   lst = s7_car(args);
   len = s7_list_length(sc, lst);
@@ -2851,7 +2820,7 @@ static s7_pointer g_ncmenu_offer_input(s7_scheme *sc, s7_pointer args)
 						(const struct ncinput *)s7_c_pointer_with_type(sc, s7_cadr(args), ncinput_symbol, __func__, 2))));
 }
 
-#if 0
+#if VERSION_2
 static s7_pointer g_ncmenu_mouse_selected(s7_scheme *sc, s7_pointer args)
 {
   return(s7_make_boolean(sc, ncmenu_mouse_selected((const struct ncmenu *)s7_c_pointer_with_type(sc, s7_car(args), ncmenu_symbol, __func__, 1), 
@@ -3199,12 +3168,13 @@ static s7_pointer g_nctablet_userptr(s7_scheme *sc, s7_pointer args)
 				     void_symbol, s7_f(sc)));
 }
 
+#if VERSION_2
 static s7_pointer g_nctablet_plane(s7_scheme *sc, s7_pointer args)
 {
   return(s7_make_c_pointer_with_type(sc, nctablet_plane((struct nctablet *)s7_c_pointer_with_type(sc, s7_car(args), nctablet_symbol, __func__, 1)), 
 				     ncplane_symbol, s7_f(sc)));
 }
-
+#endif
 
 #if 0
 /* typedef int (*tabletcb)(struct nctablet* t, int begx, int begy, int maxx, int maxy, bool cliptop);
@@ -3897,8 +3867,11 @@ void notcurses_s7_init(s7_scheme *sc)
   nc_int(NCBLIT_DEFAULT);
   nc_int(NCBLIT_1x1);
   nc_int(NCBLIT_2x1);
-  nc_int(NCBLIT_1x1x4);
+  /* nc_int(NCBLIT_1x1x4); */
   nc_int(NCBLIT_2x2);
+#if VERSION_2
+  nc_int(NCBLIT_3x2);
+#endif
   nc_int(NCBLIT_4x1);
   nc_int(NCBLIT_BRAILLE);
   nc_int(NCBLIT_8x1);
@@ -4063,7 +4036,6 @@ void notcurses_s7_init(s7_scheme *sc)
   nc_func(ncstats_make, 0, 0, false);
   nc_func(ncstats_free, 1, 0, false);
   nc_func(notcurses_stats, 2, 0, false);
-  nc_func(notcurses_reset_stats, 2, 0, false);
   nc_func(ncstats_renders, 1, 0, false);
   nc_func(ncstats_failed_renders, 1, 0, false);
   nc_func(ncstats_render_bytes, 1, 0, false);
@@ -4112,9 +4084,6 @@ void notcurses_s7_init(s7_scheme *sc)
 
   nc_func(ncplane_set_fg_rgb, 2, 0, false);
   nc_func(ncplane_set_bg_rgb, 2, 0, false);
-  nc_func(ncplane_set_styles, 2, 0, false);
-  nc_func(ncplane_on_styles, 2, 0, false);
-  nc_func(ncplane_off_styles, 2, 0, false);
   nc_func(ncplane_set_fg_palindex, 2, 0, false);
   nc_func(ncplane_set_bg_palindex, 2, 0, false);
   nc_func(ncplane_set_fg_alpha, 2, 0, false);
@@ -4158,7 +4127,6 @@ void notcurses_s7_init(s7_scheme *sc)
   nc_func(ncplane_putwegc_stained, 2, 0, false);
   nc_func(ncplane_putegc_yx, 4, 0, false);
   nc_func(ncplane_putstr_yx, 4, 0, false);
-  /* nc_func(ncplane_putnstr_aligned, 5, 0, false); */
   nc_func(ncplane_putnstr_yx, 5, 0, false);
 
   nc_func(ncplane_new, 6, 0, false);
@@ -4349,7 +4317,6 @@ void notcurses_s7_init(s7_scheme *sc)
   nc_func(ncreel_del, 2, 0, false);
   nc_func(ncreel_offer_input, 2, 0, false);
   nc_func(nctablet_userptr, 1, 0, false);
-  nc_func(nctablet_plane, 1, 0, false);
 
   nc_func(ncvisual_options_make, 0, 0, false);
   nc_func(ncvisual_options_free, 1, 0, false);
@@ -4400,6 +4367,32 @@ void notcurses_s7_init(s7_scheme *sc)
   nc_func(ncsubproc_plane, 1, 0, false);
   nc_func(ncsubproc_destroy, 1, 0, false);
 
+#if VERSION_2
+  nc_func(ncstats_writeout_ns, 1, 0, false);
+  nc_func(ncstats_writeout_max_ns, 1, 0, false);
+  nc_func(ncstats_writeout_min_ns, 1, 0, false);
+  nc_func(ncmenu_item_set_status, 4, 0, false);
+  nc_func(ncmenu_mouse_selected, 3, 0, false);
+  nc_func(nctablet_plane, 1, 0, false);
+
+  nc_func(ncplane_set_styles, 2, 0, false);
+  nc_func(ncplane_on_styles, 2, 0, false);
+  nc_func(ncplane_off_styles, 2, 0, false);
+  nc_func(notcurses_render_to_buffer, 3, 0, false);
+  nc_func(notcurses_stats_reset, 2, 0, false);
+  nc_func(notcurses_stats_alloc, 1, 0, false);
+  nc_func(ncplane_putnstr_aligned, 5, 0, false);
+
+  nc_int(NCDIRECT_OPTION_INHIBIT_SETLOCALE);
+  nc_int(NCDIRECT_OPTION_INHIBIT_CBREAK);
+
+#if 0
+  nc_int(NOTCURSES_VERSION_MAJOR);
+  nc_int(NOTCURSES_VERSION_MINOR);
+  nc_int(NOTCURSES_VERSION_PATCH);
+#endif
+#endif
+
   ncp_move_hook = s7_eval_c_string(sc, "(make-hook 'plane 'y 'x)");
   s7_define_constant_with_environment(sc, notcurses_let, "*ncp-move-hook*", ncp_move_hook);
   ncp_resize_hook = s7_eval_c_string(sc, "(make-hook 'rows 'cols)");
@@ -4420,3 +4413,4 @@ void notcurses_s7_init(s7_scheme *sc)
  *   list of lists of menu items -> (permanent) c array, arg type checks
  */
 #endif
+

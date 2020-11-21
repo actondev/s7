@@ -5,6 +5,11 @@ cp tools/ffitest.c .
 cp tools/tauto.scm .
 cp ~/cl/t923.scm .
 cp ~/cl/t101.scm .
+cp tools/*.scm .
+cp ~/cl/make-repl .
+cp ~/cl/low-primes.scm .
+cp ~/cl/full-s7test.scm .
+cp ~/cl/lt.scm .
 
 echo ' '
 echo '-------- base case --------'
@@ -15,6 +20,13 @@ repl s7test.scm
 sed 's/(define full-s7test #f)/(define full-s7test #t)/g' s7test.scm > fulltest.scm
 repl fulltest.scm
 repl tauto.scm
+
+echo ' '
+echo '-------- base case + nrepl --------'
+echo ' '
+gcc s7.c -c -I. -g3 -ldl -lm -Wl,-export-dynamic
+gcc -o nrepl nrepl.c -g3 -Wall s7.o -I. -Wl,-export-dynamic -lnotcurses -lm -ldl
+nrepl s7test.scm
 
 echo ' '
 echo '-------- s7-debugging/system-extras --------'
