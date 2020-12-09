@@ -14,7 +14,7 @@ configure_file(input : 'mus-config.h.in',
 #                output : 'mus-config.h')
 
 system = host_machine.system()
-compiler_id = meson.get_compiler('cpp').get_id()
+compiler_id = meson.get_compiler('c').get_id()
 # link_args = []
 # if system == 'linux'
 #   link_args = [
