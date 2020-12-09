@@ -5526,7 +5526,7 @@ rootlet-size                  the number of globals
 heap-size                     total cells currently available
 max-heap-size                 maximum heap size
 free-heap-size                the number of currently unused cells
-gc-stats                      0 (or #f), 1: show GC activity, 2: heap, 4: stack, #t = 1
+gc-stats                      0 (or #f), 1: show GC activity, 2: heap, 4: stack, 8: protected_objects, #t = 1
 gc-freed                      number of cells freed by the last GC pass
 gc-total-freed                number of cells freed so far by the GC; the total allocated is probably close to
                                 (with-let *s7* (+ (- heap-size free-heap-size) gc-total-freed))
@@ -10691,6 +10691,9 @@ gcc -o nrepl s7.c -O2 -I. -Wl,-export-dynamic -lm -ldl -DWITH_MAIN -DWITH_NOTCUR
 gcc -c s7.c -O2 -I. -Wl,-export-dynamic -lm -ldl
 gcc -o nrepl nrepl.c s7.o -lnotcurses -lm -I. -ldl
 </pre>
+<p>notcurses_s7.c assumes you have version 2 of the notcurses library.  If you're running
+version 1, pass -DNOTCURSES_1=1.
+</p>
 
 <p>When nrepl starts up, you have a prompt at the top of the terminal, and a status box
 at the bottom.  You can move around the pane via C-p and C-n (no need for repl.scm's M-p and M-n),

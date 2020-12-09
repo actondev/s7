@@ -154,20 +154,21 @@
 				      (or (not func) 
 					  (cadr (func (labels ellipsis-label))))))))))))
 	     
-	   (define (handle-regex reg e)
-	     (lambda (x)
-	       (and (string? x)
-		    (with-let (sublet (symbol->value '*libc* e)
-				:x x
-				:regexp (substring reg 1 (- (length reg) 1)))
-		      (let* ((rg (regex.make))
-			     (res (regcomp rg regexp 0)))
-			(unless (zero? res)
-			  (error 'regex-error "~S~%" (regerror res rg)))
-			(set! res (regexec rg x 0 0))
-			(regfree rg)
-			(regex.free rg)
-			(zero? res))))))
+	   (define handle-regex
+	     (let ((rg ((*libc* 'regex.make))) ; is this safe?
+		   (local-regcomp (*libc* 'regcomp))
+		   (local-regerror (*libc* 'regerror))
+		   (local-regexec (*libc* 'regexec))
+		   (local-regfree (*libc* 'regfree)))
+	       (lambda (reg e)
+		 (lambda (x)
+		   (and (string? x)
+			(let ((res (local-regcomp rg (substring reg 1 (- (length reg) 1)) 0)))
+			  (unless (zero? res)
+			    (error 'regex-error "~S~%" (local-regerror res rg)))
+			  (set! res (local-regexec rg x 0 0))
+			  (local-regfree rg)
+			  (zero? res)))))))
 
 	   (define (undefined->function undef e)   ; handle the pattern descriptor ("undef") of the form #< whatever >, "e" = caller's curlet
 	     (let* ((str1 (object->string undef))
