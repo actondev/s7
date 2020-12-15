@@ -4387,8 +4387,7 @@ void notcurses_s7_init(s7_scheme *sc)
   #if (defined(NOTCURSES_VERNUM_MAJOR))
     nc_int(NOTCURSES_VERNUM_MAJOR);
     nc_int(NOTCURSES_VERNUM_MINOR);
-    nc_int(NOTCURSES_VERNUM_PATCH);
-    nc_int(NOTCURSES_VERNUM_TWEAK);
+    nc_int(NOTCURSES_VERNUM_PATCH); /* tweak version "number" can be empty! */
     nc_int(NOTCURSES_VERNUM_ORDERED);
   #endif
 #endif
@@ -4420,6 +4419,10 @@ void notcurses_s7_init(s7_scheme *sc)
  *  API int ncpile_rasterize(struct ncplane* n);
  *  API struct ncplane* ncplane_reparent_family(struct ncplane* n, struct ncplane* newparent);
  *  API struct ncplane* ncpile_create(struct notcurses* nc, const ncplane_options* nopts);
+ * 2.1.0
+ * cell -> nccell, cell_load/duplicate/release/extended_gcluster
+ * ncpile_top|bottom, ncplane_resize_maximize, ncplane_descendent_p?
+ * NCPLOT_OPTION_PRINTSAMPLE
  */
 #endif
 
