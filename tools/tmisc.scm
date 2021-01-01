@@ -230,7 +230,7 @@
 ;;; -------- typers --------
 (let ()
   (define (10-or-12? val)
-    (and (integer? val)
+    (and (integer? val) ; hmmm -- this is faster than (memv val '(10 12))
 	 (or (= val 10) 
 	     (= val 12))))
   
@@ -277,6 +277,74 @@
       (set! (e1 'a) 12)))
   
   (test 100000))
+
+
+;;; -------- built-ins via #_ --------
+
+(define (u0)
+  (do ((i 0 (+ i 1)))
+      ((= i 100000) (#_list))
+    (#_list)))
+
+(unless (null? (u0)) (format *stderr* "u0: ~S~%" (u0)))
+
+(define (u1)
+  (do ((i 0 (+ i 1)))
+      ((= i 1000000) (#_length "asdfghjklijk"))
+    (#_length "asdfghjklijk")))
+
+(unless (eqv? (u1) 12) (format *stderr* "u1: ~S~%" (u1)))
+
+(define (u2)
+  (let ((str "asdfghjklijk"))
+    (do ((i 0 (+ i 1)))
+	((= i 100000) (#_char-position #\h str))
+      (#_char-position #\h str))))
+
+(unless (eqv? (u2) 5) (format *stderr* "u2: ~S~%" (u2)))
+
+(define (u3)
+  (do ((i 0 (+ i 1)))
+      ((= i 1000000) (#_+ i (* -2 i) i))
+    (#_+ i (* -2 i) i)))
+
+(unless (eqv? (u3) 0) (format *stderr* "u3: ~S~%" (u3)))
+
+
+;;; -------- methods --------
+
+(define (m5)
+  (let ((L (openlet (inlet :length (lambda (str) (+ 2 (#_string-length "asdfghjklijk")))))))
+    (do ((i 0 (+ i 1)))
+	((= i 1000000) (length L))
+      (length L))))
+
+(unless (eqv? (m5) 14) (format *stderr* "m5: ~S~%" (m5)))
+
+(define (m6)
+  (let ((L (openlet (inlet :length (lambda (str) (+ 2 (#_string-length str)))))))
+    (do ((i 0 (+ i 1)))
+	((= i 1000000) (with-let L (length "asdfghjklijk")))
+      (with-let L
+	(length "asdfghjklijk")))))
+
+(unless (eqv? (m6) 14) (format *stderr* "m6: ~S~%" (m6)))
+
+(define (m7)
+  (let ((L (openlet (inlet :+ (lambda (x y) (#_+ x y 1))))))
+    (do ((i 0 (+ i 1)))
+	((= i 500000) ((L :+) 2 3))
+      ((L :+) 2 3))))
+
+(unless (eqv? (m7) 6) (format *stderr* "m7: ~S~%" (m7)))
+
+(define (m8)
+  (let ((L (openlet (inlet :+ (lambda args (apply #_+ 1 args))))))
+    (do ((i 0 (+ i 1)))
+	((= i 500000) (with-let L (+ 2 3)))
+      (with-let L (+ 2 3)))))
+
+(unless (eqv? (m8) 6) (format *stderr* "m8: ~S~%" (m8)))
 
 
 ;;; -------- unlet --------

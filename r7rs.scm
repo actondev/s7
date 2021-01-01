@@ -41,7 +41,7 @@
   (if (null? args)
       (#_make-hash-table)
       (if (procedure? (car args))
-	  (#_make-hash-table (if (null? (cdr args)) (*s7 'default-hash-table-length) (cadr args)) (car args))
+	  (#_make-hash-table (if (null? (cdr args)) (*s7* 'default-hash-table-length) (cadr args)) (car args))
 	  (apply #_make-hash-table args))))
 
 (define bytevector byte-vector)
@@ -402,7 +402,7 @@
 (define (os-type) (car ((*libc* 'uname))))
 (define (cpu-architecture) (cadr ((*libc* 'uname))))
 (define (machine-name) (caddr ((*libc* 'uname))))
-(define (os-version) (string-append (list-ref ((*libc* 'uname)) 3) " " (list-ref ((*libc* 'uname)) 4)))
+(define (os-version) (string-append (list-ref ((*libc* 'uname)) 3) " " (list-ref ((*libc* 'uname)) 4))) ; or perhaps use /etc/os-release
 (define (implementation-name) (copy "s7"))
 (define (implementation-version) (substring (*s7* 'version) 3 7))
 

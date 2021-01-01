@@ -8,7 +8,7 @@ s7 is a Scheme interpreter.
 
 [daily tarball](https://ccrma.stanford.edu/software/s7/s7.tar.gz)
 
-[monthly tarball](https://ccrma.stanford.edu/software/s7/s7-22Nov20.tar.gz)
+[monthly tarball](https://ccrma.stanford.edu/software/s7/s7-01Jan21.tar.gz)
 
 [mailing list](http://ccrma-mail.stanford.edu/mailman/listinfo/cmdist)
 
@@ -19,6 +19,8 @@ s7 is a Scheme interpreter.
 [scheme-for-max](https://github.com/iainctduncan/scheme-for-max) (Iain Duncan)
 
 [radium](https://users.notam02.no/~kjetism/radium/) (Kjetil Matheussen)
+
+[SchemeMosaic](http://xelf.me/scheme-mosaic.html) (David O'Toole)
 
 [Common Music](http://commonmusic.sourceforge.net/) (Rick Taube)
 
