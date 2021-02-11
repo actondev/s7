@@ -12,9 +12,15 @@
 (unless (defined? '*notcurses*)          ; nrepl.c has notcurses_s7.c (thus *notcurses*) built-in
   (load "notcurses_s7.so" (inlet 'init_func 'notcurses_s7_init)))
 
-(unless (string=? (notcurses_version) "1.7.2")
-  (define ncdirect_fg ncdirect_fg_rgb)
-  (define ncdirect_bg ncdirect_bg_rgb))
+(if (and (defined? 'NOTCURSES_VERNUM_MAJOR)
+	 (>= NOTCURSES_VERNUM_MAJOR 2)
+	 (>= NOTCURSES_VERNUM_MINOR 1))
+    (begin
+      (define ncdirect_fg ncdirect_set_fg_rgb)
+      (define ncdirect_bg ncdirect_set_bg_rgb))
+    (begin
+      (define ncdirect_fg ncdirect_fg_rgb)
+      (define ncdirect_bg ncdirect_bg_rgb)))
 
 (define (drop-into-repl call e)
   ((*nrepl* 'run) "break>" (object->string call) e))
@@ -1618,7 +1624,7 @@
 		  (string=? (getenv "TERM") "dumb")))  ; no vt100 codes -- emacs subjob for example
 	    (emacs-repl)
 	    (begin
-	      (set! ncd (ncdirect_init (c-pointer 0)))
+	      (set! ncd (ncdirect_init (c-pointer 0))) ; version < 2.1 don't pass #f 0 here -- 0 must not be the old default
 	      (let ((noptions (notcurses_options_make)))
 		(set! (notcurses_options_flags noptions) NCOPTION_SUPPRESS_BANNERS)
 		(set! nc (notcurses_init noptions)))

@@ -1684,7 +1684,7 @@ In this case, the setter function does the set! itself (unlike a symbol setter):
 <em class="gray">30</em>
 </pre>
 
-<p>dilambda defines a function and its setter without having to set! the setter by hand:
+<p>dilambda defines a function (or macro) and its setter without having to set! the setter by hand:
 </p>
 
 <pre class="indented">
@@ -2556,6 +2556,7 @@ To insist that all objects are of the same type, use an explicit getter:
 <li>(<em class=def id="hashtableref">hash-table-ref</em> ht key)
 <li>(<em class=def id="hashtableset">hash-table-set!</em> ht key value)
 <li>(<em class=def id="hashtableentries">hash-table-entries</em> ht)
+<li>(<em class=def id="hashcode">hash-code</em> obj eqfunc)
 </ul>
 
 <p>
@@ -2586,6 +2587,12 @@ Implicit indexing gives multilevel hashes:
 &gt; (let ((h (hash-table 'a (hash-table 'b 2 'c 3)))) (set! (h 'a 'b) 4) (h 'a 'b))
 <em class="gray">4</em>
 </pre>
+
+<p>hash-code is like Common Lisp's sxhash.  It returns an integer that can be associated with
+an s7 object when implementing your own hash-tables.  s7test.scm has an example using vectors.
+The eqfunc argument is currently ignored (hash-code assumes equal? is in use).
+</p>
+
 
 <blockquote>
 
@@ -2851,7 +2858,8 @@ Or better,
         (b (+ c 2)))
   (+ a b c)))
 </pre>
-
+<p>It is faster to use <code>(biglet 'a-function)</code> than <code>(with-let biglet a-function)</code>.
+</p>
 
 <p><b>let-temporarily</b> (now built-into s7) is somewhat similar to fluid-let in other Schemes.
 Its syntax looks like
@@ -5199,6 +5207,8 @@ is considered to be a part of the symbol name.  A keyword is a constant that eva
 </pre>
 
 <p>If ignore-rootlet is #t, the search is confined to the given environment.
+</p>
+<p>
 <code>symbol-&gt;value</code> returns the value (lexically) bound to the symbol, whereas <code>symbol-&gt;dynamic-value</code>
 returns the value dynamically bound to it.
 </p>
@@ -5781,7 +5791,35 @@ choice here is that speed trumps that ol' hobgoblin consistency.  If you want to
 loading code that calls gcd.  
 I think most Schemes handle macros this way: the macro call is replaced by its expansion using its current
 definition, and a later redefinition does not affect earlier uses.
+Guile behaves like s7:
 </p>
+<pre class="indented">
+(define (add1 x) (+ x 1))
+(set! + -)
+(display (add1 3))) ; 4 in both s7 and Guile 3.0.4
+</pre>
+<p>But if a Scheme function is involved, things get messy:
+</p>
+<pre class="indented">
+(define (fib n) (if (&lt; n 2) n (+ (fib (- n 1)) (fib (- n 2)))))
+(define oldfib fib)
+(set! fib 32)
+(display (oldfib 10))) ; s7 says 55, Guile says "wrong type to apply: 32"
+</pre>
+<p>I can't decide which way is correct: s7 looks more consistent,
+but:
+</p>
+<pre class="indented">
+(define (fib n) 32)
+(set! fib (lambda (n) (if (&lt; n 2) n (+ (fib (- n 1)) (fib (- n 2))))))
+(define oldfib fib)
+(set! fib 32)
+(display (oldfib 10)) ; "attempt to apply an integer 32 to..."
+</pre>
+<p>So s7 is inconsistent too! (Actually this was consistent until Jan 2021 when I suddenly thought it was
+a mistake and "fixed" it; now I'm having second thoughts.
+</p>
+
 
 <!-- another case:  (with-let (inlet '+ -) (+ 2 3)) -> 5 -->
 <!-- also, (eq? (if #f #f) (apply values ())) is #t, but memq and assq don't treat them as equal -->
@@ -6334,10 +6372,6 @@ how to get pi into a key list?
 <em class="gray">4</em>
 </pre>
 
-<p>catch, dynamic-wind, and many of the other functions that take function
-arguments in standard Scheme, accept macros in s7.
-</p>
-
 <p>Apply let is very similar to eval:
 </p>
 <pre>
@@ -6357,6 +6391,16 @@ use a trailing null instead (mimicking apply* in some ancient lisps):
 &gt; (apply let '((a 2) (b 3)) '(list + a b) ())
 <em class="gray">(+ 2 3)</em>
 </pre>
+
+<p>Scheme claims that it evaluates the car of an expression, then calls the
+result with the rest of the expression.  So <code>((if x + -) y z)</code> calls either 
+<code>(+ y z)</code> or <code>(- y z)</code> depending on x.  
+But only s7, as far as I know, handles <code>((if x or and) y z)</code>.
+</p>
+
+<p>catch, dynamic-wind, and many of the other functions that take function
+arguments in standard Scheme, accept macros in s7.
+</p>
 
 <p>
 Currently, you can't set! a built-in syntactic keyword to some new value:
@@ -8987,6 +9031,9 @@ s7_pointer s7_define_typed_function(s7_scheme *sc, const char *name, s7_function
 s7_pointer s7_define_unsafe_typed_function(s7_scheme *sc, const char *name, s7_function fnc,
 					   s7_int required_args, s7_int optional_args, bool rest_arg, 
 					   const char *doc, s7_pointer signature);
+s7_pointer s7_define_semisafe_typed_function(s7_scheme *sc, const char *name, s7_function fnc,
+					     s7_int required_args, s7_int optional_args, bool rest_arg,
+					     const char *doc, s7_pointer signature);
 
 void s7_define_function_star(s7_scheme *sc, const char *name, s7_function fnc, 
                              const char *arglist, const char *doc);
@@ -9845,8 +9892,19 @@ s7_define_safe_function(sc, "plus1", g_plus_one, 1, 0, false, "");
 s7_set_i_i_function(sc, s7_name_to_value(sc, "plus1"), plus_one);
 </pre>
 <p>s7_define_safe_function defines a Scheme function "plus1",
-telling the optimizer that this function is safe.  s7_set_i_i_function
-then tells the optimizer that if plus1 is seen in a context where the optimizer
+telling the optimizer that this function is safe.  
+A safe function does not push anything on the s7 stack, and treats the arglist 
+passed to it as immutable and temporary (that is, it just grabs the arguments from 
+the list).  A few s7_* functions are unsafe, and that makes anything that calls 
+them also unsafe.  If the optimizer knows a function is safe, it can use prebuilt
+lists to pass the arguments (saving in the GC), and can combine it in various 
+ways with other stuff.  If an unsafe function handles its argument list safely,
+declare it with s7_define_semisafe_typed_function.
+If the safe function knows its return and argument
+types, there is another level of optimization that can call it without 
+setting up an arglist or "unboxing" values, basically a direct call in C.
+In this example, the s7_set_i_i_function call
+tells the optimizer that if plus1 is seen in a context where the optimizer
 knows it is receiving an s7_int argument, and is expected to return
 an s7_int result, it can call plus_one directly, rather than g_plus_one.
 </p>

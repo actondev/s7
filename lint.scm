@@ -50,9 +50,6 @@
 ;;   table of functions that are simple (no side effects) is (*lint* 'no-side-effect-functions)
 ;;   see snd-lint.scm.
 
-(when (< (*s7* 'heap-size) (* 4 1024000))
-  (set! (*s7* 'heap-size) (* 4 1024000)))
-
 ;;; --------------------------------------------------------------------------------
 
 (when (provided? 'pure-s7)
@@ -15584,7 +15581,9 @@
 				(symbol? settee))
 			   (set-ref settee caller (cons 'implicit-set (cdr form)) env)))
 
-		   (if (equal? (cadr form) setval) ; not settee here!   ;  (set! a a)
+		   (if (or (equal? (cadr form) setval) ; not settee here!          ;  (set! a a)
+			   (and (symbol? (cadr form))
+				(equal? (caddr form) (list 'copy (cadr form)))))   ;  (set! a (copy a))   
 		       (lint-format "pointless set! ~A" caller (truncated-list->string form)))
 
 		   (when (and (pair? setval)
