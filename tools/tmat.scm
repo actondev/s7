@@ -6,7 +6,7 @@
       ;; translated from Numerical Recipes (gaussj)
       (call-with-exit
        (lambda (return)
-	 (let ((n (car (vector-dimensions matrix))))
+	 (let ((n (vector-dimension matrix 0)))
 	   (let ((cols (make-int-vector n 0))
 		 (rows (make-int-vector n 0))
 		 (pivots (make-int-vector n 0)))
@@ -71,8 +71,9 @@
 		       (set! (matrix k (cols i)) temp)))))
 	     (list matrix b))))))))
 
+
 (define (matrix-multiply A B)
-  (let ((size (car (vector-dimensions A))))
+  (let ((size (vector-dimension A 0)))
     (do ((C (make-float-vector (list size size) 0))
          (i 0 (+ i 1)))
 	((= i size) C)
@@ -83,6 +84,7 @@
 	    ((= k size)
              (set! (C i j) sum))
 	  (set! sum (+ sum (* (A i k) (B k j)))))))))
+
 
 ;;; Rosetta scheme code + changes
 (define (square-matrix mat)
@@ -139,6 +141,128 @@
 		    (set! mx0 (max mx0 (abs (m1 k n)))))))))))))
   
 (testm)
+
+;;; --------------------------------------------------------------------------------
+
+(define flarray #r2d((0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20) 
+		     (0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20)
+		     (0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20)
+		     (0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20)
+		     (0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20)
+		     (0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20)
+		     (0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20)))
+
+(define tfl #r2d((0 0 0 0 0 0 0) (1 1 1 1 1 1 1) (2 2 2 2 2 2 2) (3 3 3 3 3 3 3) 
+		 (4 4 4 4 4 4 4) (5 5 5 5 5 5 5) (6 6 6 6 6 6 6) (7 7 7 7 7 7 7) 
+		 (8 8 8 8 8 8 8) (9 9 9 9 9 9 9) (10 10 10 10 10 10 10) (11 11 11 11 11 11 11)
+		 (12 12 12 12 12 12 12) (13 13 13 13 13 13 13) (14 14 14 14 14 14 14) (15 15 15 15 15 15 15)
+		 (16 16 16 16 16 16 16) (17 17 17 17 17 17 17) (18 18 18 18 18 18 18) (19 19 19 19 19 19 19) (20 20 20 20 20 20 20)))
+
+(define narray #2d((0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20) 
+		     (0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20)
+		     (0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20)
+		     (0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20)
+		     (0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20)
+		     (0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20)
+		     (0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20)))
+
+(define tna #2d((0 0 0 0 0 0 0) (1 1 1 1 1 1 1) (2 2 2 2 2 2 2) (3 3 3 3 3 3 3) 
+		 (4 4 4 4 4 4 4) (5 5 5 5 5 5 5) (6 6 6 6 6 6 6) (7 7 7 7 7 7 7) 
+		 (8 8 8 8 8 8 8) (9 9 9 9 9 9 9) (10 10 10 10 10 10 10) (11 11 11 11 11 11 11)
+		 (12 12 12 12 12 12 12) (13 13 13 13 13 13 13) (14 14 14 14 14 14 14) (15 15 15 15 15 15 15)
+		 (16 16 16 16 16 16 16) (17 17 17 17 17 17 17) (18 18 18 18 18 18 18) (19 19 19 19 19 19 19) (20 20 20 20 20 20 20)))
+
+(define tries 10000)
+(set! (*s7* 'print-length) 123123)
+
+(define (matrix-transpose mat)
+  (let* ((dims (vector-dimensions mat))
+	 (new-mat (make-vector (reverse dims)))
+	 (end1 (car dims))
+	 (end2 (cadr dims)))
+    (do ((i 0 (+ i 1)))
+	((= i end1) new-mat)
+      (do ((j 0 (+ j 1)))
+	  ((= j end2))
+	(set! (new-mat j i) (mat i j))))))
+
+(unless (equal? (matrix-transpose narray) tna)
+  (format *stderr* "tna: ~S~%" (matrix-transpose narray)))
+
+(define (test-transpose)
+  (do ((i 0 (+ i 1)))
+      ((= i  tries))
+    (matrix-transpose narray)))
+
+(test-transpose)
+
+
+(define (matrix-transpose1 mat)
+  (let* ((dims (vector-dimensions mat))
+	 (new-mat (make-vector (reverse dims)))
+	 (end1 (car dims))
+	 (end2 (cadr dims)))
+    (do ((i 0 (+ i 1)))
+	((= i end1) new-mat)
+      (do ((j 0 (+ j 1)))
+	  ((= j end2))
+	(vector-set! new-mat j i (vector-ref mat i j))))))
+
+(unless (equal? (matrix-transpose1 narray) tna)
+  (format *stderr* "tna1: ~S~%" (matrix-transpose1 narray)))
+
+(define (test-transpose1)
+  (do ((i 0 (+ i 1)))
+      ((= i tries))
+    (matrix-transpose1 narray)))
+
+(test-transpose1)
+
+
+(define (float-matrix-transpose mat)
+  (let* ((dims (vector-dimensions mat))
+	 (new-mat (make-float-vector (reverse dims)))
+	 (end1 (car dims))
+	 (end2 (cadr dims)))
+    (do ((i 0 (+ i 1)))
+	((= i end1) new-mat)
+      (do ((j 0 (+ j 1)))
+	  ((= j end2))
+	(set! (new-mat j i) (mat i j))))))
+
+(unless (equal? (float-matrix-transpose flarray) tfl)
+  (format *stderr* "tfl: ~S~%" (float-matrix-transpose flarray)))
+
+(define (test-float-transpose)
+  (do ((i 0 (+ i 1)))
+      ((= i tries))
+    (float-matrix-transpose flarray)))
+
+(test-float-transpose)
+
+
+(define (float-matrix-transpose1 mat)
+  (let* ((dims (vector-dimensions mat))
+	 (new-mat (make-float-vector (reverse dims)))
+	 (end1 (car dims))
+	 (end2 (cadr dims)))
+    (do ((i 0 (+ i 1)))
+	((= i end1) new-mat)
+      (do ((j 0 (+ j 1)))
+	  ((= j end2))
+	(float-vector-set! new-mat j i (float-vector-ref mat i j))))))
+
+(unless (equal? (float-matrix-transpose1 flarray) tfl)
+  (format *stderr* "tfl1: ~S~%" (float-matrix-transpose1 flarray)))
+
+(define (test-float-transpose1)
+  (do ((i 0 (+ i 1)))
+      ((= i tries))
+    (float-matrix-transpose1 flarray)))
+
+(test-float-transpose1)
+
+
 
 (when (> (*s7* 'profile) 0)
   (show-profile 200))

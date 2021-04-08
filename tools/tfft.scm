@@ -80,11 +80,8 @@
       (set! ui ti))
     #t))
  
-(if (not (defined? 'complex))
-  (define complex make-rectangular))
-(if (not (defined? 'when))
-  (define-macro (when test . body) `(if ,test (begin ,@body))))
 
+;;; --------------------------------------------------------------------------------
 (define* (cfft data n (dir 1)) ; complex data
   (unless n (set! n (length data)))
   (do ((i 0 (+ i 1))
@@ -121,13 +118,14 @@
       (set! wc (* wc wpc))))
   data)
 
-(when (defined? 'equivalent?)
-  (unless (equivalent? (cfft (vector 0.0 1+i 0.0 0.0)) #(1+1i -1+1i -1-1i 1-1i))
-    (format *stderr* "cfft 1: ~S~%" (cfft (vector 0.0 1+i 0.0 0.0))))
-  (let-temporarily (((*s7* 'equivalent-float-epsilon) 1e-14))
-    (unless (equivalent? (cfft (vector 0 0 1+i 0 0 0 1-i 0)) #(2 -2 -2 2 2 -2 -2 2))
-      (format *stderr* "cfft 2: ~S~%" (cfft (vector 0 0 1+i 0 0 0 1-i 0))))))
+(unless (equivalent? (cfft (vector 0.0 1+i 0.0 0.0)) #(1+1i -1+1i -1-1i 1-1i))
+  (format *stderr* "cfft 1: ~S~%" (cfft (vector 0.0 1+i 0.0 0.0))))
+(let-temporarily (((*s7* 'equivalent-float-epsilon) 1e-14))
+  (unless (equivalent? (cfft (vector 0 0 1+i 0 0 0 1-i 0)) #(2 -2 -2 2 2 -2 -2 2))
+    (format *stderr* "cfft 2: ~S~%" (cfft (vector 0 0 1+i 0 0 0 1-i 0)))))
 
+
+;;; --------------------------------------------------------------------------------
 (define (fft-bench)
   (let ((*re* (make-float-vector (+ size 1) 0.10))
 	(*im* (make-float-vector (+ size 1) 0.10)))
@@ -146,6 +144,350 @@
  
 (fft-bench)
 
+
+;;;--------------------------------------------------------------------------------
+;; 2D dft, real data, spot-checked against fftw ("backward", for "forward" case, use (- (im yout xout)...))
+(define (dft2 in)
+  (let* ((dims (vector-dimensions in))
+         (h (car dims))
+         (w (cadr dims))
+	 (ih (/ (* 2.0 pi) h))
+	 (iw (/ (* 2.0 pi) w))
+         (rl (make-float-vector dims 0.0))
+         (im (make-float-vector dims 0.0))
+	 (out (make-float-vector dims)))
+    (do ((yout 0 (+ yout 1)))
+        ((= yout h) 
+	 (do ((i 0 (+ i 1)))
+	     ((= i h) 
+	      (list rl im out))
+	   (do ((j 0 (+ j 1)))
+	       ((= j w))
+	     (set! (out i j) (+ (* (rl i j) (rl i j)) 
+				(* (im i j) (im i j)))))))
+      (do ((xout 0 (+ xout 1)))
+          ((= xout w))
+        (do ((yin 0 (+ yin 1)))
+            ((= yin h))
+          (do ((xin 0 (+ xin 1)))
+              ((= xin w))
+            (set! (rl yout xout) (+ (rl yout xout) 
+				    (* (in yin xin) 
+				       (cos (+ (* xout xin iw) 
+					       (* yout yin ih))))))
+            (set! (im yout xout) (+ (im yout xout) 
+				    (* (in yin xin) 
+				       (sin (+ (* xout xin iw) 
+					       (* yout yin ih))))))))))))
+
+(let ((vs (dft2 #r2d((1.0 0.0 -1.0 0.0)
+		     (0.0 0.0 0.0 0.0)
+		     (0.0 1.0 0.0 0.0)
+		     (0.0 0.0 0.0 0.0)))))
+  (let-temporarily (((*s7* 'equivalent-float-epsilon) 1.0e-14))
+    (unless (equivalent? (car vs) #r2d((1.0 2.0 -1.0 2.0) (-1.0 2.0 1.0 2.0) (1.0 2.0 -1.0 2.0) (-1.0 2.0 1.0 2.0)))
+      (format *stderr* "dft2 rl: ~S~%" (car vs)))
+    (unless (equivalent? (cadr vs) #r2d((0.0 1.0 0 -1.0) (0.0 -1.0 0.0 1.0) (0.0 1.0 0.0 -1.0) (0.0 -1.0 0.0 1.0)))
+      (format *stderr* "dft2 im: ~S~%" (cadr vs)))
+    (unless (equivalent? (caddr vs) #r2d((1.0 5.0 1.0 5.0) (1.0 5.0 1.0 5.0) (1.0 5.0 1.0 5.0) (1.0 5.0 1.0 5.0)))
+      (format *stderr* "dft2 out: ~S~%" (caddr vs)))))
+
+(define (test-dft2)
+  (let ((mat (make-float-vector '(16 16) 0.0)))
+    (set! (mat 0 8) 1.0)
+    (dft2 mat)
+    (fill! mat 0.0)
+    (set! (mat 0 0) 1.0)
+    (set! (mat 8 8) 1.0)
+    (dft2 mat)
+    (fill! mat 0.0)
+    (set! (mat 0 0) 1.0)
+    (set! (mat 4 4) 0.5)
+    (set! (mat 8 8) 1.0)
+    (dft2 mat)
+    (fill! mat 0.0)
+    (set! (mat 0 0) 1.0)
+    (set! (mat 2 0) 0.5)
+    (set! (mat 8 8) 1.0)
+    (dft2 mat)))
+
+(test-dft2)
+
+
+;;; --------------------------------------------------------------------------------
+;; 3D dft as above but the "forward" case
+(define (dft3 in)
+  (let* ((dims (vector-dimensions in))
+         (h (car dims))
+         (w (cadr dims))
+	 (d (caddr dims))
+	 (ih (/ (* 2.0 pi) h))
+	 (iw (/ (* 2.0 pi) w))
+	 (id (/ (* 2.0 pi) d))
+         (rl (make-float-vector dims))
+         (im (make-float-vector dims))
+	 (out (make-float-vector dims)))
+    (do ((yout 0 (+ yout 1)))
+        ((= yout h) 
+	 (do ((i 0 (+ i 1)))
+	     ((= i h) 
+	      (list rl im out))
+	   (do ((j 0 (+ j 1)))
+	       ((= j w))
+	     (do ((k 0 (+ k 1)))
+	       ((= k d))
+	       (set! (out i j k) 
+		     (+ (* (rl i j k) (rl i j k)) 
+			(* (im i j k) (im i j k))))))))
+      (do ((xout 0 (+ xout 1)))
+          ((= xout w))
+	(do ((zout 0 (+ zout 1)))
+	    ((= zout d))
+	  (do ((yin 0 (+ yin 1)))
+	      ((= yin h))
+	    (do ((xin 0 (+ xin 1)))
+		((= xin w))
+	      (do ((zin 0 (+ zin 1)))
+		  ((= zin d))
+		(set! (rl yout xout zout)
+		      (+ (rl yout xout zout) 
+			 (* (in yin xin zin) 
+			    (cos (+ (* xout xin iw) 
+				    (* yout yin ih)
+				    (* zout zin id))))))
+		(set! (im yout xout zout)
+		      (- (im yout xout zout) 
+			 (* (in yin xin zin) 
+			    (sin (+ (* xout xin iw) 
+				    (* yout yin ih)
+				    (* zout zin id))))))))))))))
+
+(let ((vs (dft3 #r3d(((1.0 0.5 0.0 0.0) (0.0 0.0 0.0 0.0) (0.0 0.0 0.0 0.0) (0.0 0.0 0.0 0.0))
+		     ((0.0 0.0 0.0 0.0) (0.0 0.0 0.0 0.0) (0.0 0.0 0.0 0.0) (0.0 0.0 0.0 0.0))
+		     ((0.0 0.0 0.0 0.0) (0.0 0.0 0.0 0.0) (0.0 0.0 0.0 0.0) (0.0 0.0 0.0 0.0))
+		     ((0.0 0.0 0.0 0.0) (0.0 0.0 0.0 0.0) (0.0 0.0 0.0 0.0) (0.0 0.0 0.0 0.0))))))
+  (let-temporarily (((*s7* 'equivalent-float-epsilon) 1.0e-14)
+                    ((*s7* 'print-length) 128))
+    (unless (equivalent? (car vs)
+			 #r3d(((1.5 1.0 0.5 1.0) (1.5 1.0 0.5 1.0) (1.5 1.0 0.5 1.0) (1.5 1.0 0.5 1.0))
+			       ((1.5 1.0 0.5 1.0) (1.5 1.0 0.5 1.0) (1.5 1.0 0.5 1.0) (1.5 1.0 0.5 1.0)) 
+			       ((1.5 1.0 0.5 1.0) (1.5 1.0 0.5 1.0) (1.5 1.0 0.5 1.0) (1.5 1.0 0.5 1.0))
+			       ((1.5 1.0 0.5 1.0) (1.5 1.0 0.5 1.0) (1.5 1.0 0.5 1.0) (1.5 1.0 0.5 1.0))))
+      (format *stderr* "dft3 rl: ~S~%" (car vs)))
+    (unless (equivalent? (cadr vs) 
+			 #r3d(((0.0 -0.5 0.0 0.5) (0.0 -0.5 0.0 0.5) (0.0 -0.5 0.0 0.5) (0.0 -0.5 0.0 0.5))
+			      ((0.0 -0.5 0.0 0.5) (0.0 -0.5 0.0 0.5) (0.0 -0.5 0.0 0.5) (0.0 -0.5 0.0 0.5))
+			      ((0.0 -0.5 0.0 0.5) (0.0 -0.5 0.0 0.5) (0.0 -0.5 0.0 0.5) (0.0 -0.5 0.0 0.5))
+			      ((0.0 -0.5 0.0 0.5) (0.0 -0.5 0.0 0.5) (0.0 -0.5 0.0 0.5) (0.0 -0.5 0.0 0.5))))
+      (format *stderr* "dft3 im: ~S~%" (cadr vs)))
+    (unless (equivalent? (caddr vs) 
+			 #r3d(((2.25 1.25 0.25 1.25) (2.25 1.25 0.25 1.25) (2.25 1.25 0.25 1.25) (2.25 1.25 0.25 1.25))
+			      ((2.25 1.25 0.25 1.25) (2.25 1.25 0.25 1.25) (2.25 1.25 0.25 1.25) (2.25 1.25 0.25 1.25))
+			      ((2.25 1.25 0.25 1.25) (2.25 1.25 0.25 1.25) (2.25 1.25 0.25 1.25) (2.25 1.25 0.25 1.25)) 
+			      ((2.25 1.25 0.25 1.25) (2.25 1.25 0.25 1.25) (2.25 1.25 0.25 1.25) (2.25 1.25 0.25 1.25))))
+      (format *stderr* "dft3 out: ~S~%" (caddr vs)))))
+
+(define (test-dft3)
+  (let ((mat (make-float-vector '(8 8 8) 0.0)))
+    ;(set! (mat 0 4 0) 1.0)
+    ;(dft3 mat)
+    ;(fill! mat 0.0)
+    (set! (mat 0 0 0) 1.0)
+    (set! (mat 4 4 4) 1.0)
+    (dft3 mat)))
+
+(test-dft3)
+
+;;; check the explicit case
+
+(define (dft3ex in)
+  (let* ((dims (vector-dimensions in))
+         (h (car dims))
+         (w (cadr dims))
+	 (d (caddr dims))
+	 (ih (/ (* 2.0 pi) h))
+	 (iw (/ (* 2.0 pi) w))
+	 (id (/ (* 2.0 pi) d))
+         (rl (make-float-vector dims))
+         (im (make-float-vector dims))
+	 (out (make-float-vector dims)))
+    (do ((yout 0 (+ yout 1)))
+        ((= yout h) 
+	 (do ((i 0 (+ i 1)))
+	     ((= i h) 
+	      (list rl im out))
+	   (do ((j 0 (+ j 1)))
+	       ((= j w))
+	     (do ((k 0 (+ k 1)))
+	       ((= k d))
+	       (float-vector-set! out i j k
+		     (+ (* (float-vector-ref rl i j k) (float-vector-ref rl i j k)) 
+			(* (float-vector-ref im i j k) (float-vector-ref im i j k))))))))
+      (do ((xout 0 (+ xout 1)))
+          ((= xout w))
+	(do ((zout 0 (+ zout 1)))
+	    ((= zout d))
+	  (do ((yin 0 (+ yin 1)))
+	      ((= yin h))
+	    (do ((xin 0 (+ xin 1)))
+		((= xin w))
+	      (do ((zin 0 (+ zin 1)))
+		  ((= zin d))
+		(float-vector-set! rl yout xout zout
+		      (+ (float-vector-ref rl yout xout zout) 
+			 (* (float-vector-ref in yin xin zin) 
+			    (cos (+ (* xout xin iw) 
+				    (* yout yin ih)
+				    (* zout zin id))))))
+		(float-vector-set! im yout xout zout
+		      (- (float-vector-ref im yout xout zout) 
+			 (* (float-vector-ref in yin xin zin) 
+			    (sin (+ (* xout xin iw) 
+				    (* yout yin ih)
+				    (* zout zin id))))))))))))))
+
+(let ((vs (dft3ex #r3d(((1.0 0.5 0.0 0.0) (0.0 0.0 0.0 0.0) (0.0 0.0 0.0 0.0) (0.0 0.0 0.0 0.0))
+		    ((0.0 0.0 0.0 0.0) (0.0 0.0 0.0 0.0) (0.0 0.0 0.0 0.0) (0.0 0.0 0.0 0.0))
+		    ((0.0 0.0 0.0 0.0) (0.0 0.0 0.0 0.0) (0.0 0.0 0.0 0.0) (0.0 0.0 0.0 0.0))
+		    ((0.0 0.0 0.0 0.0) (0.0 0.0 0.0 0.0) (0.0 0.0 0.0 0.0) (0.0 0.0 0.0 0.0))))))
+  (let-temporarily (((*s7* 'equivalent-float-epsilon) 1.0e-14)
+                    ((*s7* 'print-length) 128))
+    (unless (equivalent? (car vs)
+			 #r3d(((1.5 1.0 0.5 1.0) (1.5 1.0 0.5 1.0) (1.5 1.0 0.5 1.0) (1.5 1.0 0.5 1.0))
+			       ((1.5 1.0 0.5 1.0) (1.5 1.0 0.5 1.0) (1.5 1.0 0.5 1.0) (1.5 1.0 0.5 1.0)) 
+			       ((1.5 1.0 0.5 1.0) (1.5 1.0 0.5 1.0) (1.5 1.0 0.5 1.0) (1.5 1.0 0.5 1.0))
+			       ((1.5 1.0 0.5 1.0) (1.5 1.0 0.5 1.0) (1.5 1.0 0.5 1.0) (1.5 1.0 0.5 1.0))))
+      (format *stderr* "dft3ex rl: ~S~%" (car vs)))
+    (unless (equivalent? (cadr vs) 
+			 #r3d(((0.0 -0.5 0.0 0.5) (0.0 -0.5 0.0 0.5) (0.0 -0.5 0.0 0.5) (0.0 -0.5 0.0 0.5))
+			      ((0.0 -0.5 0.0 0.5) (0.0 -0.5 0.0 0.5) (0.0 -0.5 0.0 0.5) (0.0 -0.5 0.0 0.5))
+			      ((0.0 -0.5 0.0 0.5) (0.0 -0.5 0.0 0.5) (0.0 -0.5 0.0 0.5) (0.0 -0.5 0.0 0.5))
+			      ((0.0 -0.5 0.0 0.5) (0.0 -0.5 0.0 0.5) (0.0 -0.5 0.0 0.5) (0.0 -0.5 0.0 0.5))))
+      (format *stderr* "dft3ex im: ~S~%" (cadr vs)))
+    (unless (equivalent? (caddr vs) 
+			 #r3d(((2.25 1.25 0.25 1.25) (2.25 1.25 0.25 1.25) (2.25 1.25 0.25 1.25) (2.25 1.25 0.25 1.25))
+			      ((2.25 1.25 0.25 1.25) (2.25 1.25 0.25 1.25) (2.25 1.25 0.25 1.25) (2.25 1.25 0.25 1.25))
+			      ((2.25 1.25 0.25 1.25) (2.25 1.25 0.25 1.25) (2.25 1.25 0.25 1.25) (2.25 1.25 0.25 1.25)) 
+			      ((2.25 1.25 0.25 1.25) (2.25 1.25 0.25 1.25) (2.25 1.25 0.25 1.25) (2.25 1.25 0.25 1.25))))
+      (format *stderr* "dft3ex out: ~S~%" (caddr vs)))))
+
+
+(define (test-dft3ex)
+  (let ((mat (make-float-vector '(9 9 9) 0.0)))
+    (float-vector-set! mat 0 0 0 1.0)
+    (dft3ex mat)))
+
+(test-dft3ex)
+
+
+
 (when (> (*s7* 'profile) 0)
   (show-profile 200))
 (exit)
+
+
+#|
+;;; fft3.c:
+#include <unistd.h>
+#include <stdio.h>
+#include <ctype.h>
+#include <string.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <inttypes.h>
+#include <complex.h>
+#include <fftw3.h>
+
+static fftw_complex *c_in_data = NULL, *c_out_data = NULL;
+static fftw_plan c_r_plan, c_i_plan;  
+static int last_c_fft_size = 0;   
+
+static void mus_fftw_with_imag(double *rl, double *im, int h, int w, int d, int dir)
+{
+  int i, j, k;
+
+  c_in_data = (fftw_complex *)fftw_malloc(w * h * d * sizeof(fftw_complex)); /* rl/im data is double */
+  c_out_data = (fftw_complex *)fftw_malloc(w * h * d * sizeof(fftw_complex));
+  c_r_plan = fftw_plan_dft_3d(h, w, d, c_in_data, c_out_data, FFTW_FORWARD, FFTW_ESTIMATE); 
+  c_i_plan = fftw_plan_dft_3d(h, w, d, c_in_data, c_out_data, FFTW_BACKWARD, FFTW_ESTIMATE);
+
+  for (i = 0; i < h; i++)
+    for (j = 0; j < w; j++)
+      for (k = 0; k < d; k++)
+	c_in_data[(i * w * d) + (j * d) + k] = rl[(i * w * d) + (j * d) + k] + _Complex_I * im[(i * w * d) + (j * d) + k];
+
+  if (dir == -1) 
+    fftw_execute(c_r_plan);
+  else fftw_execute(c_i_plan);
+
+  for (i = 0; i < h; i++)
+    for (j = 0; j < w; j++)
+      for (k = 0; k < d; k++)
+	{
+	  rl[(i * w * d) + (j * d) + k] = creal(c_out_data[(i * w * d) + (j * d) + k]);
+	  im[(i * w * d) + (j * d) + k] = cimag(c_out_data[(i * w * d) + (j * d) + k]);
+	}
+}
+
+int main(int argc, char **argv)
+{
+  double *rl, *im;
+  int h, w, d, i, j, k;
+  h = 4;
+  w = 4;
+  d = 4;
+  rl = (double *)calloc(h * w * d, sizeof(double));
+  im = (double *)calloc(h * w * d, sizeof(double));
+  
+  rl[0] = 1.0;
+  rl[1] = 0.5;
+
+  mus_fftw_with_imag(rl, im, h, w, d, -1);
+
+  fprintf(stderr, "#r3d(");
+  for (i = 0; i < h; i++)
+    {
+      fprintf(stderr, "(");
+      for (j = 0; j < w; j++)
+	{
+	  fprintf(stderr, "(");
+	  for (k = 0; k < d; k++)
+	    fprintf(stderr, "%.3f ", rl[(i * w * d) + (j * d) + k]);
+	  fprintf(stderr, ")");
+	}
+      fprintf(stderr, ")");
+    }
+  fprintf(stderr, ")\n");
+
+  fprintf(stderr, "#r3d(");
+  for (i = 0; i < h; i++)
+    {
+      fprintf(stderr, "(");
+      for (j = 0; j < w; j++)
+	{
+	  fprintf(stderr, "(");
+	  for (k = 0; k < d; k++)
+	    fprintf(stderr, "%.3f ", im[(i * w * d) + (j * d) + k]);
+	  fprintf(stderr, ")");
+	}
+      fprintf(stderr, ")");
+    }
+  fprintf(stderr, ")\n");
+
+  fprintf(stderr, "#r3d(");
+  for (i = 0; i < h; i++)
+    {
+      fprintf(stderr, "(");
+      for (j = 0; j < w; j++)
+	{
+	  fprintf(stderr, "(");
+	  for (k = 0; k < d; k++)
+	    fprintf(stderr, "%.3f ", 
+		    rl[(i * w * d) + (j * d) + k] * rl[(i * w * d) + (j * d) + k] + im[(i * w * d) + (j * d) + k] * im[(i * w * d) + (j * d) + k]);
+	  fprintf(stderr, ")");
+	}
+      fprintf(stderr, ")");
+    }
+  fprintf(stderr, ")\n");
+}
+|#

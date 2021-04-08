@@ -394,6 +394,7 @@
 	       (set! result (cons `(set! (setter (quote ,(caar var))) (list-ref ,gsetters ,i)) result))))
        ,@body)))
 
+#|
 (define-macro (while test . body)      ; while loop with predefined break and continue
   `(call-with-exit
     (lambda (break)
@@ -403,6 +404,15 @@
 	      (let () ,@body)
 	      (continue))
 	    (break))))))
+|#
+(define-macro (while test . body)      ; while loop with predefined break and continue
+  `(call-with-exit
+    (lambda (break)
+      (let continue ()
+	(when ,test
+	  ,@body
+	  (continue))))))
+
 
 (define-macro (do* spec end . body)
   `(let* ,(map (lambda (var)
@@ -1558,6 +1568,33 @@ Unlike full-find-if, safe-find-if can handle any circularity in the sequences.")
 
 ;;; --------------------------------------------------------------------------------
 
+(define (probe-eval val)
+  (let ((probe-let (inlet)))
+    (for-each
+     (lambda (sym)
+       (let ((func (symbol->value sym (rootlet))))
+	 (if (and (procedure? func)
+		  (not (immutable? sym))) ; apply-values etc
+	     (varlet probe-let sym
+		     (lambda args
+		       (let-temporarily (((*s7* 'openlets) #f))
+			 (let ((clean-args (map (lambda (arg)
+						  (if (eq? arg probe-let)
+						      (probe-let 'value)
+						      arg))
+						args)))
+			   (format *stderr* "(~S ~{~S~^ ~})~%" sym clean-args)
+			   (apply func clean-args))))))))
+     (symbol-table))
+    (varlet probe-let 'value val)
+    (openlet probe-let)))
+
+;;(define (call-any x) (+ x 21))
+;;(display (call-any (probe-eval 42))) -> (+ 42 21) 63
+
+
+;;; --------------------------------------------------------------------------------
+
 (define null-environment
   (let ((e #f))
     (lambda ()
@@ -1573,6 +1610,8 @@ Unlike full-find-if, safe-find-if can handle any circularity in the sequences.")
 
 ;;; (sandbox '(let ((x 1)) (+ x 2))) -> 3
 ;;; (sandbox '(let ((x 1)) (+ x 2) (exit))) -> #f
+
+;; perhaps tgsl's (immutable-let (rootlet))? 
 
 (define sandbox
   (let ((+documentation+ "(sandbox code) evaluates code in an environment where nothing outside that code can be affected by its evaluation.")
@@ -1609,8 +1648,8 @@ Unlike full-find-if, safe-find-if can handle any circularity in the sequences.")
 	      cdddr cdadr cddar caaaar caaadr caadar cadaar caaddr cadddr cadadr caddar cdaaar cdaadr
 	      cdadar cddaar cdaddr cddddr cddadr cdddar assoc member list list-ref list-set! list-tail
 	      make-list length copy fill! reverse reverse! sort! append assq assv memq memv vector-append
-	      list->vector vector-fill! vector-length vector->list vector-ref vector-set! vector-dimensions
-	      make-vector subvector vector float-vector make-float-vector float-vector-set!
+	      list->vector vector-fill! vector-length vector->list vector-ref vector-set! vector-dimension vector-dimensions
+	      make-vector subvector vector float-vector make-float-vector float-vector-set! vector-rank
 	      float-vector-ref int-vector make-int-vector int-vector-set! int-vector-ref string->byte-vector
 	      byte-vector make-byte-vector hash-table make-hash-table hash-table-ref weak-hash-table
 	      hash-table-set! hash-table-entries cyclic-sequences call/cc call-with-current-continuation

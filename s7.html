@@ -1715,10 +1715,11 @@ In this case, the setter function does the set! itself (unlike a symbol setter):
   ;; c?r returns a dilambda that gets/sets X
 
   (define (X-marks-the-spot accessor tree)
-    (if (pair? tree)
-	(or (X-marks-the-spot (cons 'car accessor) (car tree))
-	    (X-marks-the-spot (cons 'cdr accessor) (cdr tree)))
-	(and (eq? tree 'X) accessor)))
+    (if (eq? tree 'X)
+        accessor
+        (and (pair? tree)
+	     (or (X-marks-the-spot (cons 'car accessor) (car tree))
+	         (X-marks-the-spot (cons 'cdr accessor) (cdr tree))))))
 
   (let ((body 'lst))
     (for-each
@@ -2150,7 +2151,8 @@ an integer as in the one dimensional case:
 <code>(vect i ...)</code> or <code>(vector-ref vect i ...)</code> return the given
 element, and <code>(set! (vect i ...) value)</code> and <code>(vector-set! vect i ... value)</code>
 set it.  vector-length (or just length) returns the total number of elements.
-vector-dimensions returns a list of the dimensions.
+vector-dimensions returns a list of the dimensions; vector-rank returns the length of this list, 
+and vector-dimension returns the nth member of the list (the size of the nth dimension).
 </p>
 
 <pre class="indented">
@@ -2181,6 +2183,9 @@ s7_ints, s7_doubles, or unsigned bytes.
 
 <pre class="indented">
 (<em class=def id="makevector">make-vector</em> length-or-list-of-dimensions initial-value element-type-function)
+(<em class=def id="vectordimensions">vector-dimensions</em> vect)
+(<em class=def id="vectordimension">vector-dimension</em> vect n)
+(<em class=def id="vectorrank">vector-rank</em> obj)
 
 (<em class=def>float-vector?</em> obj)
 (<em class=def>float-vector</em> . args)
@@ -2266,7 +2271,7 @@ but that conflicts with substring, and is confusing (the start position follows 
 the old subvector to the new:
 </p>
 <pre class="indented">
-(define (old-subvector vect len (offset 0))
+(define* (old-subvector vect len (offset 0))
   (if (pair? len)
       (subvector vect offset (+ offset (apply * len)) len)
       (if (not len)
@@ -4769,7 +4774,9 @@ the locals themselves immutable:
   L)
 </pre>
 <p>Now <code>(vars-immutable! let)</code> makes it an error to set! any of the locals, but you
-can add locals to the let.  To completely petrify the let, <code>(immutable! (vars-immutable! let))</code>.
+can add locals to the let.  
+You can speed up evaluation by doing this because it tells the optimizer that the current entries in the let will not change.
+To completely petrify the let, <code>(immutable! (vars-immutable! let))</code>.
 To make a function's documentation immutable: <code>(with-let (funclet 'f2) (immutable! '+documentation+))</code>,
 and similarly for other function closure entries.
 </p>
@@ -5947,13 +5954,50 @@ Better ideas are always welcome!
 </p>
 
 <p>(<b><em class=def id="currentfunction">*function*</em></b>) returns the name (or name and location) of the function currently being called.
-It can be treated as a let, similar to *s7* but its first argument is the let to search from:
-<code>(*function* (curlet) 'name)</code>.
-The following fields can be passed (as symbols):
-<code>name</code> returns the name (a symbol) of the current function; <code>line</code> returns
-its definition line number; <code>file</code> returns its definition file; <code>signature</code>, <code>documentation</code>,
-<code>arity</code>, <code>arglist</code>, <code>value</code>, and <code>source</code> return 
-various info about the current function; <code>funclet</code> returns the current function's funclet.
+<code>(define (example) (*function*))</code> returns <code>'example</code>.
+Here is an example using a bacro (to access the call-time environment) and an openlet to implement a probe; 
+it reports any operation that the probe participates in, using *function* to get the calling function name:
+</p>
+<pre class="indented">
+(define (probe-eval val)
+  (let ((all-let (inlet)))
+    (for-each
+     (lambda (sym)
+       (unless (immutable? sym) ; apply-values etc
+	 (let ((func (symbol-&gt;value sym (rootlet))))
+	   (when (procedure? func)
+	     (varlet all-let sym
+		     (apply <em class=red>bacro</em> 'args
+		       `((let-temporarily (((*s7* 'openlets) #f))
+			   (let ((clean-args (map (lambda (arg)
+						    (if (eq? arg probe-eval)
+							(probe-eval 'value)
+							arg))
+						  args)))
+			   (format *stderr* "(~S ~{~S~^ ~}) ; ~S~%" 
+                                   ,sym clean-args 
+                                   (<em class=red>*function*</em> (outlet (outlet (curlet)))))
+			   (apply ,func clean-args))))))))))
+     (symbol-table))
+    (varlet all-let 'value val)
+    (<em class=red>openlet</em> all-let)))
+
+(define (call-any x)
+  (+ x 21))
+
+(call-any (probe-eval 42)) ; prints "(+ 42 21) ; call-any", returns 63
+</pre>
+<p>
+The second argument to *function* is the let from which to start searching for a function. 
+In the example above, we start the search from the let outside the bacro, since we hope to find the bacro's caller.
+As a convenience, *function* takes an optional third argument specifying what information you want 
+about the current function. An example: <code>(*function* (curlet) 'name)</code>.
+<code>name</code> returns the name (a symbol) of the current function.
+<code>line</code> returns the function's definition line number.
+<code>file</code> returns the function's definition file.
+Other possibilities are <code>signature</code>, <code>documentation</code>,
+<code>arity</code>, <code>arglist</code>, <code>value</code>, and <code>source</code>.
+<code>funclet</code> returns the current function's funclet.
 </p>
 
 <p>Currently WITH_PURE_S7:
@@ -9235,6 +9279,7 @@ s7_funclet returns the top let within the function (the let containing the argum
 <pre class="indented">
 bool s7_is_c_object(s7_pointer p);
 s7_pointer s7_make_c_object(s7_scheme *sc, s7_int type, void *value);
+s7_pointer s7_make_c_object_without_gc(s7_scheme *sc, s7_int type, void *value);
 s7_pointer s7_make_c_object_with_let(s7_scheme *sc, s7_int type, void *value, s7_pointer let);
 
 s7_int s7_c_object_type(s7_pointer obj);
@@ -9326,7 +9371,9 @@ s7_c_object_set_let(s7, m, g_mark_methods);
 an appropriate mark of course), object-&gt;let calls the object's object-&gt;let method.
 Don't forget to GC-protect the let!
 </p>
-
+<p>s7_make_c_object_without_gc makes a c-object of the given type, but the gc_free function
+won't be called when the s7_cell that holds the C data is freed for reuse.
+</p>
 
 <div class="shortheader" id="cio">IO</div>
 <pre class="indented">
