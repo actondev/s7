@@ -1,6 +1,6 @@
-/* nrepl, notcurses-base repl
+/* nrepl, notcurses-based repl
  *
- * gcc -o nrepl nrepl.c s7.o -Wl,-export-dynamic -lnotcurses -lm -I. -ldl
+ * gcc -o nrepl nrepl.c s7.o -Wl,-export-dynamic -lnotcurses-core -lm -I. -ldl
  */
 
 #include <stdio.h>
@@ -368,12 +368,10 @@ static int nrepl(s7_scheme *sc)
 #if 0
 /*
   gcc -c s7.c -O2 -I. -Wl,-export-dynamic -lm -ldl
-  gcc -o nrepl nrepl.c s7.o -lnotcurses -lm -I. -ldl
+  gcc -o nrepl nrepl.c s7.o -lnotcurses-core -lm -I. -ldl
 
   To build s7 to nrepl in one line:
-    gcc -o nrepl s7.c -O2 -I. -Wl,-export-dynamic -lm -ldl -DWITH_MAIN -DWITH_NOTCURSES -lnotcurses
-
-  In version 2.1.6(7?) add -lnotcurses-core after -lnotcurses
+    gcc -o nrepl s7.c -O2 -I. -Wl,-export-dynamic -lm -ldl -DWITH_MAIN -DWITH_NOTCURSES -lnotcurses-core
 
   nrepl-bits.h is generated from (make-nrepl-bits.scm):
 

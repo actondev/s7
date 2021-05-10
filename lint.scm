@@ -37,6 +37,7 @@
 (define *report-boolean-functions-misbehaving* #t)        ; function name ends in #\? but function returns a non-boolean value -- dubious.
 (define *report-quasiquote-rewrites* #t)                  ; simple quasiquote stuff rewritten as a normal list expression
 (define *report-||-rewrites* #t)                          ; | has no special meaning in s7, |...| does not represent the symbol ...
+(define *report-constant-expressions-in-do* #t)           ; a first stab at this
 
 ;;; these turn out to be less useful than I expected
 (define *report-repeated-code-fragments* 200)             ; #t, #f, or an int = min reported fragment size * uses * uses, #t=130.
@@ -392,8 +393,7 @@
     (let ()
       (require write.scm)
       (set! lint-pp pp)
-      (set! lint-pp-funclet (funclet pretty-print))
-      (set! (lint-pp-funclet '*pretty-print-cycles*) #f))
+      (set! lint-pp-funclet (funclet pretty-print)))
 
     (denote (lists->string f1 f2)
       (let ((str1 (lint-truncate-string (object->string f1 #t (+ target-line-length 2)))))
@@ -18847,7 +18847,7 @@
 							    (lambda args
 							      :eval-error)))))
 					   (if (and val (not (eq? val :eval-error)))
-					       (lint-format "do is unnecessary: ~A" caller form))))))
+					       (lint-format "do is unnecessary: ~A" caller (truncated-list->string form)))))))
 
 				 ;; if found, v is the var info
 				 (let ((v (and (len>1? end)
@@ -18887,6 +18887,91 @@
 	    (lint-walk-body caller 'do (cdddr form) (cons (make-lint-var :do form 'do)
 							  inner-env))
 
+	    (when (and *report-constant-expressions-in-do*
+		       (pair? (cdr form)))
+	      (let ((local-vars (let ((lv ()))
+				  (for-each (lambda (p)
+					      (if (pair? p) ; s7test (messed-up do)
+						  (set! lv (cons (car p) lv))))
+					    (cadr form))
+				  lv)))
+		(call-with-exit
+		 (lambda (quit)
+		   (let walker ((code (cdddr form))) ; get anything that changes in the loop
+		     (when (pair? code)
+		       (if (memq (car code) binders)
+			   (cond ((and (memq (car code) '(define* define-macro define-macro* define-bacro define-bacro* define-expansion))
+				       (pair? (cdr code))             ; lg hits this
+				       (pair? (cadr code)))
+				  (set! local-vars (cons (caadr code) local-vars)))
+
+				 ((memq (car code) '(load eval eval-string require provide quote))
+				  (quit))
+
+				 ((and (memq (car code) '(define define-constant))
+				       (pair? (cdr code)))    ; lg
+				  (set! local-vars (cons ((if (pair? (cadr code)) caadr cadr) code) local-vars))))
+
+			   (if (and (memq (car code) '(set! vector-set! list-set! hash-table-set! float-vector-set! int-vector-set!
+						       string-set! let-set! fill! string-fill! list-fill! vector-fill!
+						       reverse! sort! set-car! set-cdr!))
+				    (pair? (cdr code)))            ; lg again
+			       (set! local-vars (cons (cadr code) local-vars))
+			       (begin
+				 (walker (car code))
+				 (walker (cdr code)))))))
+		   (let walker ((code (cdddr form)))  ; look for exprs (or portions thereof) that don't change
+		     (unless (or (not (pair? code))
+				 (memq (car code) binders)
+				 (memq (car code) '(quote case))
+				 (hash-table-ref makers (car code)))
+		       (when (hash-table-ref no-side-effect-functions (car code))
+			 (if (memq (car code) '(* + - /))
+			     (when (> (length code) 3) ; counting '* etc
+			       (let ((cs 0))
+				 (for-each (lambda (p)
+					     (if (or (code-constant? p) 
+						     (and (symbol? p)
+							  (not (memq p local-vars)))
+						     (and (pair? p)
+							  (not (tree-set-memq local-vars p))
+							  (not (side-effect? p env))
+							  (not (eq? 'random (car p)))))
+						 (set! cs (+ cs 1))))
+					   (cdr code))
+				 (when (> cs 1)
+				   (let ((new-code
+					  (let ((expr (if (memq (car code) '(+ *))
+							  (list (car code))
+							  (if (not (or (memq (cadr code) local-vars)
+								       (and (pair? (cadr code))
+									    (or (tree-set-memq local-vars (cadr code))
+										(side-effect? (cadr code) env)))))
+							      (list (car code))
+							      (list (if (eq? (car code) '-) '+ '*))))))
+					    (do ((p (cdr code) (cdr p)))
+						((null? p)
+						 (reverse! expr))
+					      (unless (or (memq (car p) local-vars)
+							  (and (pair? (car p))
+							       (or (tree-set-memq local-vars (car p))
+								   (side-effect? (car p) env))))
+						(set! expr (cons (car p) expr)))))))
+				     (if (equal? new-code code)
+					 (lint-format "~S is constant in the do loop" caller code)
+					 (lint-format "~S in ~S is constant in the do loop" caller new-code code))))))
+			     
+			     (when (and (not (memq (car code) local-vars))
+					(not (eq? (car code) 'quote))
+					(lint-every? (lambda (v)
+						       (or (code-constant? v)
+							   (and (symbol? v)
+								(not (memq v local-vars)))))
+						     (cdr code)))
+			       (lint-format "~S could be moved out of the do loop" caller code))))
+		       (walker (car code))
+		       (walker (cdr code))))))))
+	    
 	    ;; before report-usage, check for unused variables, and don't complain about them if
 	    ;;   they are referenced in an earlier step expr.
 	    (do ((v vars (cdr v)))
@@ -23456,7 +23541,8 @@
 
 	;; -------- call lint --------
 
-	(let ((vars (let-temporarily (((*s7* 'expansions?) #f))
+	(let ((vars (let-temporarily (((*s7* 'expansions?) #f)
+				      ((lint-pp-funclet '*pretty-print-cycles*) #f))
 		      (lint-file file ()))))
 	  (set! lint-left-margin (max lint-left-margin 1))
 
