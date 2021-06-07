@@ -1,4 +1,4 @@
-(set! (*s7* 'heap-size) (* 6 1024000))
+(set! (*s7* 'heap-size) (* 12 1024000))
 
 (define (reader)
   (let ((port (open-input-file "/home/bil/cl/bib"))
@@ -105,7 +105,7 @@
 	  (display "oops")))
     (for-each (lambda (key&value)
 		(unless (= (car key&value) (cdr key&value))
-		    (display "oops"))) ;(format *stderr* "hash iter ~A~%" key&value)))
+		  (display "oops"))) ;(format *stderr* "hash iter ~A~%" key&value)))
 	      (make-iterator int-hash p))
     (set! int-hash #f)))
 

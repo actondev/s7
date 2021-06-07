@@ -2429,7 +2429,7 @@ in the latter case, you can't clobber one of the inner vectors.
 &gt; (let ((V #(#(1 2 3) #(4 5 6)))) (set! (V 1) 32) V)
 <em class="gray">#(#(1 2 3) 32)</em>
 &gt; (let ((V #2d((1 2 3) (4 5 6)))) (set! (V 1) 32) V)
-<em class="gray">;not enough args for vector-set!: (#2d((1 2 3) (4 5 6)) 1 32)</em>
+<em class="gray">;not enough arguments for vector-set!: (#2d((1 2 3) (4 5 6)) 1 32)</em>
 </pre>
 </div>
 
@@ -5242,7 +5242,7 @@ Here we scan the symbol table looking for any function that doesn't have documen
 
 <div class="indented">
 
-<p>An automatic software tester (see tauto.scm and auto-tester.scm in snd tools for extensions):
+<p>An automatic software tester (see also tauto.scm and auto-tester.scm in the tools directory):
 </p>
 
 <pre class="indented">
@@ -5533,9 +5533,9 @@ file-names                    currently loaded files (a list)
 catches                       a list of the currently active catch tags
 c-types                       a list of c-object type names (from s7_make_c_type, etc)
 
+stack			      the current stack entries
 stack-top                     current stack location
 stack-size                    current stack size
-stack                         the current stack entries
 max-stack-size                maximum stack size
 stacktrace-defaults           stacktrace formatting info for error handler
 
@@ -5628,6 +5628,10 @@ The defaults are '(3 45 80 45 #t).
 				     (set! log10 (log (bignum 10)))
 				     val)))
 </pre>
+
+<p>The stack, history and gc-protected-objects fields are intended for debugging.  Don't keep 
+these hanging around and expect good things to happen!
+</p>
 
 
 <div class="separator"></div>
@@ -6443,7 +6447,8 @@ But only s7, as far as I know, handles <code>((if x or and) y z)</code>.
 </p>
 
 <p>catch, dynamic-wind, and many of the other functions that take function
-arguments in standard Scheme, accept macros in s7.
+arguments in standard Scheme, accept macros in s7, and dynamic-wind accepts
+#f as the initial and final entries.
 </p>
 
 <p>
@@ -6565,9 +6570,22 @@ Finally, go back to the benchmarks directory and
 bench s7 all
 </pre>
 
-<p>The benchmark compiler.scm assumes that small
+<p>
+The benchmark compiler.scm assumes that small
 integers can be compared with eq? (via assq), which is incorrect.
 pi.scm and chudnovsky.scm need the gmp version of s7.
+I ran the bench script on an AMD 3950X machine, and got these results (in seconds):
+ack: 6.6, array1: 6.4, browse: 11.2, bv2string: 4.1, cat: 0.4,
+compiler: 16.9, conform: 30.0, cpstak: 42.8, ctak: 16.6, deriv: 9.7,
+destruc: 8.6, diviter: 3.7, divrec: 4.6, dynamic: 12.6, earley: 25.5,
+equal: 0.3, fft: 12.5, fib: 6.1, fibc: 8.6, fibfp: 1.1, gcbench: 12.9,
+grahps: 72.5, lattice: 63.4, matrix: 21.0, maze: 11.4, mazefun: 9.8,
+mbrot: 12.6, mbrotZ: 8.0, mperm: 18.9, nboyer: 20.1, nqueens: 27.0,
+ntakl: 8.0, nucleic: 8.3, paraffins: 4.4, parsing: 20.7, peval: 15.2,
+pnpoly: 9.8, primes: 10.2, puzzle: 10.2, quicksort: 40.0, ray: 8.3,
+read1: 0.2, sboyer: 19.1, scheme: 29.5, simplex: 26.9, slatex: 4.2,
+string: 0.1, sum1: 0.2, sum: 4.1, sumfp: 2.2, tail: 0.1, tak: 7.1,
+takl: 8.1, triangl: 16.4, wc: 4.9.  In the gmp case, chudnovsky: 0.017, pi: .01.
 </p>
 </div>
 
@@ -10014,7 +10032,7 @@ add a symbol to the *features* list, or check for its presence there.
 <p>s7_stacktrace is like stacktrace; it currently ignores (*s7* 'stacktrace).
 The s7_history functions deal with the (*s7* 'history) buffer.
 s7_dynamic_wind is dynamic-wind in C.  The parameters "init", "body", and "finish" are
-the same as ion scheme (i.e. #f or a thunk).  s7_make_continuation is call/cc; there
+the same as in scheme (i.e. #f or a thunk).  s7_make_continuation is call/cc; there
 is an <a href="#signal">example</a> above.
 s7_values is values, s7_copy is copy, s7_fill is fill!, s7_type_of is type-of, s7_is_syntax
 is syntax?. 

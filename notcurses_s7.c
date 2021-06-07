@@ -514,6 +514,14 @@ static s7_pointer g_set_notcurses_options_flags(s7_scheme *sc, s7_pointer args)
   return(s7_cadr(args));
 }
 
+static s7_pointer g_set_notcurses_options_loglevel(s7_scheme *sc, s7_pointer args)
+{
+  notcurses_options *no;
+  no = (notcurses_options *)s7_c_pointer_with_type(sc, s7_car(args), notcurses_options_symbol, __func__, 1);
+  no->loglevel = (uint64_t)s7_integer_checked(sc, s7_cadr(args));
+  return(s7_cadr(args));
+}
+
 static s7_pointer g_notcurses_options_make(s7_scheme *sc, s7_pointer args)
 {
   return(s7_make_c_pointer_with_type(sc, (void *)calloc(1, sizeof(notcurses_options)), notcurses_options_symbol, s7_f(sc)));
@@ -1253,12 +1261,21 @@ static s7_pointer g_ncplane_dim_yx(s7_scheme *sc, s7_pointer args)
   return(s7_list(sc, 2, s7_make_integer(sc, y), s7_make_integer(sc, x)));
 }
 
+#if (NC_CURRENT_VERSION < NC_VERSION(2, 2, 10))
 static s7_pointer g_cell_load(s7_scheme *sc, s7_pointer args)
 {
   return(s7_make_integer(sc, cell_load((struct ncplane *)s7_c_pointer_with_type(sc, s7_car(args), ncplane_symbol, __func__, 1), 
 				       (cell *)s7_c_pointer_with_type(sc, s7_cadr(args), cell_symbol, __func__, 2),
 				       (const char *)s7_string_checked(sc, s7_caddr(args)))));
 }
+#else
+static s7_pointer g_nccell_load(s7_scheme *sc, s7_pointer args)
+{
+  return(s7_make_integer(sc, nccell_load((struct ncplane *)s7_c_pointer_with_type(sc, s7_car(args), ncplane_symbol, __func__, 1), 
+				       (cell *)s7_c_pointer_with_type(sc, s7_cadr(args), cell_symbol, __func__, 2),
+				       (const char *)s7_string_checked(sc, s7_caddr(args)))));
+}
+#endif
 
 #if (NC_CURRENT_VERSION < NC_VERSION(2, 2, 5))
 static s7_pointer g_cell_duplicate(s7_scheme *sc, s7_pointer args)
@@ -4006,15 +4023,19 @@ void notcurses_s7_init(s7_scheme *sc)
 
   nc_func(notcurses_options_termtype, 1, 0, false);
   nc_func(notcurses_options_renderfp, 1, 0, false);
-  nc_func(notcurses_options_loglevel, 1, 0, false);
 
   #define nc_func2(Name) s7_dilambda_with_environment(sc, notcurses_let, #Name, g_ ## Name, 1, 0, g_set_ ## Name, 2, 0, NULL)
+  #define nc_func3(NcName, Name) \
+    do {s7_dilambda_with_environment(sc, notcurses_let, #NcName, g_ ## Name, 1, 0, g_set_ ## Name, 2, 0, NULL); \
+        s7_dilambda_with_environment(sc, notcurses_let, #Name, g_ ## Name, 1, 0, g_set_ ## Name, 2, 0, NULL);} while (0)
+  /* this is becoming ridiculous */
   
   nc_func2(notcurses_options_margin_t);
   nc_func2(notcurses_options_margin_r);
   nc_func2(notcurses_options_margin_b);
   nc_func2(notcurses_options_margin_l);
   nc_func2(notcurses_options_flags);
+  nc_func2(notcurses_options_loglevel);
 
   nc_func(notcurses_core_init, 0, 2, false);
   nc_func(notcurses_stop, 1, 0, false);
@@ -4177,7 +4198,12 @@ void notcurses_s7_init(s7_scheme *sc)
   nc_func(ncplane_reparent_family, 2, 0, false);
 
   nc_func(cell_make, 0, 0, false);
+#if (NC_CURRENT_VERSION < NC_VERSION(2, 2, 10))
   nc_func(cell_load, 3, 0, false);
+#else
+  nc_func(nccell_load, 3, 0, false);
+  s7_define(sc, notcurses_let, s7_make_symbol(sc, "nccell_make"), s7_make_function(sc, "nccell_make", g_cell_make, 0, 0, false, NULL));
+#endif
 
   #define nc_old_func(Name, OldName, Req, Opt, Rst)			\
     s7_define(sc, notcurses_let,					\
@@ -4205,17 +4231,14 @@ void notcurses_s7_init(s7_scheme *sc)
   nc_func(nccells_double_box, 9, 0, false);
   nc_func(nccells_rounded_box, 9, 0, false);
   nc_func(nccells_load_box, 10, 0, false);
-  nc_func2(nccell_gcluster);
-  nc_func2(nccell_stylemask);
-  nc_func2(nccell_channels);
+  nc_func3(nccell_gcluster, cell_gcluster);
+  nc_func3(nccell_stylemask, cell_stylemask);
+  nc_func3(nccell_channels, cell_channels);
 
   nc_old_func(nccell_extended_gcluster, "cell_extended_gcluster", 2, 0, false);
   nc_old_func(nccells_double_box, "cells_double_box", 9, 0, false);
   nc_old_func(nccells_rounded_box, "cells_rounded_box", 9, 0, false);
   nc_old_func(nccells_load_box, "cells_load_box", 10, 0, false);
-  nc_old_func2(nccell_gcluster, "cell_gcluster");
-  nc_old_func2(nccell_stylemask, "cell_stylemask");
-  nc_old_func2(nccell_channels, "cell_channels");
 #endif
 
   nc_func(ncfadectx_setup, 1, 0, false);
@@ -4476,14 +4499,13 @@ void notcurses_s7_init(s7_scheme *sc)
  * 2.1.2
  *  notcurses_linesigs_enable|disable
  * 2.1.4
- *  NCDIRECT_OPTION_NO_QUIT_SIGHANDLERS
  *  HIRES additions
  *  API int ncplane_at_cursor_cell(struct ncplane* n, nccell* c);
  *  API int ncplane_at_yx_cell(struct ncplane* n, int y, int x, nccell* c);
  *  API ncblitter_e ncvisual_media_defblitter(const struct notcurses* nc, ncscale_e scale);
  *  API bool notcurses_cansextant(const struct notcurses* nc);
  *  API int ncdirect_raster_frame(struct ncdirect* n, ncdirectv* ncdv, ncalign_e align);
- *  API ncdirectv* ncdirect_render_frame(struct ncdirect* n, const char* filename, ncblitter_e blitter, ncscale_e scale);
+ *  API ncdirect* ncdirect_render_frame(struct ncdirect* n, const char* filename, ncblitter_e blitter, ncscale_e scale);
  */
 #endif
 

@@ -11,16 +11,11 @@
 
 (unless (defined? '*notcurses*)          ; nrepl.c has notcurses_s7.c (thus *notcurses*) built-in
   (load "notcurses_s7.so" (inlet 'init_func 'notcurses_s7_init)))
-
-(if (and (defined? 'NOTCURSES_VERNUM_MAJOR)
-	 (>= NOTCURSES_VERNUM_MAJOR 2)
-	 (>= NOTCURSES_VERNUM_MINOR 1))
-    (begin
-      (define ncdirect_fg ncdirect_set_fg_rgb)
-      (define ncdirect_bg ncdirect_set_bg_rgb))
-    (begin
-      (define ncdirect_fg ncdirect_fg_rgb)
-      (define ncdirect_bg ncdirect_bg_rgb)))
+(unless (defined? 'nccell_make)        (define nccell_make cell_make))
+(unless (defined? 'nccell_gcluster)    (define nccell_gcluster cell_gcluster))
+(unless (defined? 'nccell_channels)    (define nccell_channels cell_channels))
+(unless (defined? 'nccell_stylemask)   (define nccell_stylemask cell_stylemask))
+(unless (defined? 'nccells_double_box) (define nccells_double_box cells_double_box))
 
 (define (drop-into-repl call e)
   ((*nrepl* 'run) "break>" (object->string call) e))
@@ -67,12 +62,11 @@
 
 (unless (defined? '*nrepl*)
   (define *nrepl*
-    (let* ((ncd #f)
-	   (nc #f)
+    (let* ((nc #f)
 	   (nc-cols 0)
 	   (nc-rows 0)
 	   (status-rows 3)
-	   (status-cells (vector (cell_make) (cell_make) (cell_make) (cell_make) (cell_make) (cell_make)))
+	   (status-cells (vector (nccell_make) (nccell_make) (nccell_make) (nccell_make) (nccell_make) (nccell_make)))
 	   (statp #f)
 	   (statp-row 0)
 	   (recursor #f)
@@ -261,13 +255,13 @@
 
       (define (statp-set-bg-color r g b)
 	;; (statp-bg-set-color 0.85 0.85 0.85): light gray background
-	(let ((c1 (cell_make)))
+	(let ((c1 (nccell_make)))
 	  (let ((color (logior (ash (floor (* r 256)) 16)
 			       (ash (floor (* g 256)) 8)
 			       (floor (* b 256)))))
-	    (set! (cell_gcluster c1) (char->integer #\space))
-	    (set! (cell_channels c1) (logior CELL_FGDEFAULT_MASK CELL_BGDEFAULT_MASK color)))
-	  (set! (cell_stylemask c1) 0)
+	    (set! (nccell_gcluster c1) (char->integer #\space))
+	    (set! (nccell_channels c1) (logior CELL_FGDEFAULT_MASK CELL_BGDEFAULT_MASK color)))
+	  (set! (nccell_stylemask c1) 0)
 	  (ncplane_set_base_cell statp c1)
 	  (notcurses_render nc)
 	  c1))
@@ -291,17 +285,17 @@
 
       ;; -------- red text --------
       (define (red c)
-	(let ((c1 (cell_make)))
-	  (set! (cell_gcluster c1) (char->integer c))
-	  (set! (cell_channels c1)  (logior CELL_FGDEFAULT_MASK #xff000000000000))
-	  (set! (cell_stylemask c1) 0)
+	(let ((c1 (nccell_make)))
+	  (set! (nccell_gcluster c1) (char->integer c))
+	  (set! (nccell_channels c1)  (logior CELL_FGDEFAULT_MASK #xff000000000000))
+	  (set! (nccell_stylemask c1) 0)
 	  c1))
 
       (define (normal c)
-	(let ((c1 (cell_make)))
-	  (set! (cell_gcluster c1) (char->integer c))
-	  (set! (cell_channels c1)  0)
-	  (set! (cell_stylemask c1) 0)
+	(let ((c1 (nccell_make)))
+	  (set! (nccell_gcluster c1) (char->integer c))
+	  (set! (nccell_channels c1)  0)
+	  (set! (nccell_stylemask c1) 0)
 	  c1))
 
       (define red-error (let ((v (make-vector 5)))
@@ -345,15 +339,13 @@
 
 	  (define (move-cursor y x)   ; this was (format *stderr* "~C[~D;~DH" #\escape y x) in repl.scm
 	    (notcurses_refresh nc)    ; needed in 1.7.1, not in 1.6.11
-
-	    (ncdirect_cursor_move_yx ncd
+	    (notcurses_cursor_enable nc 
 				     (max header-row (+ y ncp-row))
 				     (if (and wc (= y (+ watch-row 1)))
 					 (min (- watch-col 1) (+ x ncp-col))
 					 (+ x ncp-col))))
-
 	  (when header
-	    (set! hc-cells (vector (cell_make) (cell_make) (cell_make) (cell_make) (cell_make) (cell_make)))
+	    (set! hc-cells (vector (nccell_make) (nccell_make) (nccell_make) (nccell_make) (nccell_make) (nccell_make)))
 	    (let ((newline-pos (char-position #\newline header)))
 	      (if newline-pos
 		  (let loop ((str (substring header (+ newline-pos 1)))
@@ -366,7 +358,7 @@
 				(nlen (length newlines)))
 			    (set! hc (ncplane_new nc (+ 3 nlen) ncp-cols 0 0 (c-pointer 0)))
 			    (ncplane_cursor_move_yx hc 0 0)
-			    (cells_double_box hc 0 0 (hc-cells 0) (hc-cells 1) (hc-cells 2) (hc-cells 3) (hc-cells 4) (hc-cells 5))
+			    (nccells_double_box hc 0 0 (hc-cells 0) (hc-cells 1) (hc-cells 2) (hc-cells 3) (hc-cells 4) (hc-cells 5))
 			    (ncplane_box hc (hc-cells 0) (hc-cells 1) (hc-cells 2) (hc-cells 3) (hc-cells 4) (hc-cells 5) (+ 1 nlen) (- nc-cols 1) 0)
 			    (set! header-strings (make-vector nlen))
 			    (do ((i 0 (+ i 1))
@@ -384,7 +376,7 @@
 		  (begin
 		    (set! hc (ncplane_new nc 3 ncp-cols 0 0 (c-pointer 0)))
 		    (ncplane_cursor_move_yx hc 0 0)
-		    (cells_double_box hc 0 0 (hc-cells 0) (hc-cells 1) (hc-cells 2) (hc-cells 3) (hc-cells 4) (hc-cells 5))
+		    (nccells_double_box hc 0 0 (hc-cells 0) (hc-cells 1) (hc-cells 2) (hc-cells 3) (hc-cells 4) (hc-cells 5))
 		    (ncplane_box hc (hc-cells 0) (hc-cells 1) (hc-cells 2) (hc-cells 3) (hc-cells 4) (hc-cells 5) 2 (- nc-cols 1) 0)
 		    (ncplane_putstr_yx hc 1 1 (make-string (- nc-cols 5) #\space))
 		    (set! header-strings (vector header))
@@ -400,10 +392,10 @@
 	    (ncplane_move_below ncp statp) ; statp always displayed with ncplanes sliding underneath conceptually
 
 	    ;; opaque plane
-	    (let ((c1 (cell_make)))
-	      (set! (cell_gcluster c1) (char->integer #\space))
-	      (set! (cell_channels c1) 0)
-	      (set! (cell_stylemask c1) 0)
+	    (let ((c1 (nccell_make)))
+	      (set! (nccell_gcluster c1) (char->integer #\space))
+	      (set! (nccell_channels c1) 0)
+	      (set! (nccell_stylemask c1) 0)
 	      (ncplane_set_base_cell ncp c1)
 	      (notcurses_render nc))
 
@@ -696,17 +688,17 @@
 				   (var-str (format #f "~A: ~A" var (substring str (+ pos 9)))))
 
 			      (unless wc
-				(set! wc-cells (vector (cell_make) (cell_make) (cell_make) (cell_make) (cell_make) (cell_make)))
+				(set! wc-cells (vector (nccell_make) (nccell_make) (nccell_make) (nccell_make) (nccell_make) (nccell_make)))
 				(set! watch-row header-row)
 				(set! watch-col (floor (* 0.618 nc-cols))) ; ah the good old days
 				(set! watch-cols (- nc-cols watch-col))
 				(set! wc (ncplane_new nc watch-rows watch-cols watch-row watch-col (c-pointer 0)))
-				(cells_double_box wc 0 0 (wc-cells 0) (wc-cells 1) (wc-cells 2) (wc-cells 3) (wc-cells 4) (wc-cells 5))
+				(nccells_double_box wc 0 0 (wc-cells 0) (wc-cells 1) (wc-cells 2) (wc-cells 3) (wc-cells 4) (wc-cells 5))
 				(ncplane_box wc (wc-cells 0) (wc-cells 1) (wc-cells 2) (wc-cells 3) (wc-cells 4) (wc-cells 5) (- watch-rows 1) (- watch-cols 1) 0)
-				(let ((c1 (cell_make)))
-				  (set! (cell_gcluster c1) (char->integer #\space))
-				  (set! (cell_channels c1) 0)   ; opaque apparently
-				  (set! (cell_stylemask c1) 0)
+				(let ((c1 (nccell_make)))
+				  (set! (nccell_gcluster c1) (char->integer #\space))
+				  (set! (nccell_channels c1) 0)   ; opaque apparently
+				  (set! (nccell_stylemask c1) 0)
 				  (ncplane_set_base_cell wc c1)
 				  (notcurses_render nc)))
 
@@ -1624,7 +1616,6 @@
 		  (string=? (getenv "TERM") "dumb")))  ; no vt100 codes -- emacs subjob for example
 	    (emacs-repl)
 	    (begin
-	      (set! ncd (ncdirect_core_init (c-pointer 0))) ; version < 2.1 don't pass #f 0 here -- 0 must not be the old default
 	      (let ((noptions (notcurses_options_make)))
 		(set! (notcurses_options_flags noptions) NCOPTION_SUPPRESS_BANNERS)
 		(set! nc (notcurses_core_init noptions)))
@@ -1636,7 +1627,7 @@
 		(set! nc-rows (car size))
 		(set! statp-row (- nc-rows status-rows)))
 	      (set! statp (ncplane_new nc nc-rows nc-cols 0 0 (c-pointer 0)))
-	      (cells_double_box statp 0 0 (status-cells 0) (status-cells 1) (status-cells 2) (status-cells 3) (status-cells 4) (status-cells 5))
+	      (nccells_double_box statp 0 0 (status-cells 0) (status-cells 1) (status-cells 2) (status-cells 3) (status-cells 4) (status-cells 5))
 	      (ncplane_putstr_yx statp 1 1 (make-string (- nc-cols 5) #\space))
 	      (when (string-position "rxvt" (getenv "TERM"))
 		(ncplane_putstr_yx statp 1 2 (substring "rxvt doesn't support the mouse" 0 (min 30 (- nc-cols 3))))
