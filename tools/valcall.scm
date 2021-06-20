@@ -39,6 +39,7 @@
 		     ("tmock.scm" . "v-mock")
 		     ("concordance.scm" . "v-str")
 		     ("tgsl.scm" . "v-gsl")
+		     ("tlist.scm" . "v-list")
 		     ))
 
 (define (last-callg)
@@ -72,8 +73,8 @@
 	 (system (format #f "./snd compare-calls.scm -e '(compare-calls \"~A~D\" \"~A~D\")'" outfile (- next 1) outfile next)))))
 
    (list (list "repl" "tpeak.scm")
-	 (list "repl" "tauto.scm")
 	 (list "repl" "tref.scm")
+	 (list "repl" "tauto.scm")
 	 (list "repl" "tshoot.scm")
 	 (list "snd -noinit" "make-index.scm")
 	 (list "repl" "tmock.scm")
@@ -99,10 +100,11 @@
 	 (list "repl" "tclo.scm")
 	 (list "repl" "tmap.scm")
 	 (list "repl" "tfft.scm")
-	 (list "repl" "tmisc.scm")
 	 (list "repl" "tnum.scm")
-	 (list "repl" "trec.scm")
+	 (list "repl" "tmisc.scm")
 	 (list "repl" "tgsl.scm")
+	 (list "repl" "trec.scm")
+	 (list "repl" "tlist.scm")
 	 (list "repl" "tgc.scm")
 	 (list "repl" "thash.scm")
 	 (list "snd -noinit" "tgen.scm")    ; repl here + cload sndlib was slower
