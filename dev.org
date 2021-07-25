@@ -1,3 +1,13 @@
+#+begin_src sh
+git fetch upstream master:upstream
+#+end_src
+* cloning upstream
+  #+begin_src sh
+openssl s_client -showcerts -servername cm-gitlab.stanford.edu -connect cm-gitlab.stanford.edu:443 </dev/null 2>/dev/null | sed -n -e '/BEGIN\ CERTIFICATE/,/END\ CERTIFICATE/ p'  > ~/.ssh/cm-gitlab.stanford.edu.pem
+
+# the following command writes to ~/.gitconfig
+git config --global http."https://cm-gitlab.stanford.edu".sslCAInfo ~/.ssh/cm-gitlab.stanford.edu.pem
+  #+end_src
 * Merging gitlab master
   master is now in [[https://cm-gitlab.stanford.edu/bil/s7][gitlab]], with fresh git history. So, to merge:
   #+BEGIN_SRC sh

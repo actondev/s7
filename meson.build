@@ -33,6 +33,7 @@ compiler_id = meson.get_compiler('c').get_id()
 
 link_args = [
   '-lm', # math
+  '-ldl', # only for linux?
   ]
 
 s7 = library('s7',
