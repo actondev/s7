@@ -1,10 +1,10 @@
 #ifndef S7_H
 #define S7_H
 
-#define S7_VERSION "9.15"
-#define S7_DATE "2-Aug-2021"
+#define S7_VERSION "9.18"
+#define S7_DATE "30-Sep-2021"
 #define S7_MAJOR_VERSION 9
-#define S7_MINOR_VERSION 15
+#define S7_MINOR_VERSION 18
 
 #include <stdint.h>           /* for int64_t */
 
@@ -296,9 +296,11 @@ s7_int s7_vector_rank(s7_pointer vect);                                     /* n
 s7_int s7_vector_dimension(s7_pointer vec, s7_int dim);
 s7_pointer *s7_vector_elements(s7_pointer vec);                             /* a pointer to the array of s7_pointers */
 s7_int *s7_int_vector_elements(s7_pointer vec);
+uint8_t *s7_byte_vector_elements(s7_pointer vec);
 s7_double *s7_float_vector_elements(s7_pointer vec);
 bool s7_is_float_vector(s7_pointer p);                                      /* (float-vector? p) */
 bool s7_is_int_vector(s7_pointer p);                                        /* (int-vector? p) */
+bool s7_is_byte_vector(s7_pointer p);                                       /* (byte-vector? p) */
 
 s7_pointer s7_vector_ref(s7_scheme *sc, s7_pointer vec, s7_int index);                            /* (vector-ref vec index) */
 s7_pointer s7_vector_set(s7_scheme *sc, s7_pointer vec, s7_int index, s7_pointer a);              /* (vector-set! vec index a) */
@@ -309,11 +311,14 @@ s7_int s7_vector_offsets(s7_pointer vec, s7_int *offs, s7_int offs_size);
 
 s7_int s7_int_vector_ref(s7_pointer vec, s7_int index);
 s7_int s7_int_vector_set(s7_pointer vec, s7_int index, s7_int value);
+uint8_t s7_byte_vector_ref(s7_pointer vec, s7_int index);
+uint8_t s7_byte_vector_set(s7_pointer vec, s7_int index, uint8_t value);
 s7_double s7_float_vector_ref(s7_pointer vec, s7_int index);
 s7_double s7_float_vector_set(s7_pointer vec, s7_int index, s7_double value);
 
 s7_pointer s7_make_vector(s7_scheme *sc, s7_int len);                                 /* (make-vector len) */
 s7_pointer s7_make_int_vector(s7_scheme *sc, s7_int len, s7_int dims, s7_int *dim_info);
+s7_pointer s7_make_byte_vector(s7_scheme *sc, s7_int len, s7_int dims, s7_int *dim_info);
 s7_pointer s7_make_float_vector(s7_scheme *sc, s7_int len, s7_int dims, s7_int *dim_info);
 s7_pointer s7_make_normal_vector(s7_scheme *sc, s7_int len, s7_int dims, s7_int *dim_info); /* make-vector but possibly multidimensional */
 s7_pointer s7_make_float_vector_wrapper(s7_scheme *sc, s7_int len, s7_double *data, s7_int dims, s7_int *dim_info, bool free_data);
@@ -366,7 +371,8 @@ s7_pointer s7_open_input_string(s7_scheme *sc, const char *input_string);
 s7_pointer s7_open_output_string(s7_scheme *sc);                            /* (open-output-string) */
 const char *s7_get_output_string(s7_scheme *sc, s7_pointer out_port);       /* (get-output-string port) -- current contents of output string */
   /*    don't free the string */
-void s7_flush_output_port(s7_scheme *sc, s7_pointer p);                     /* (flush-output-port port) */
+s7_pointer s7_output_string(s7_scheme *sc, s7_pointer p);                   /*    same but returns an s7 string */
+bool s7_flush_output_port(s7_scheme *sc, s7_pointer p);                     /* (flush-output-port port) */
 
 typedef enum {S7_READ, S7_READ_CHAR, S7_READ_LINE, S7_PEEK_CHAR, S7_IS_CHAR_READY, S7_NUM_READ_CHOICES} s7_read_t;
 s7_pointer s7_open_output_function(s7_scheme *sc, void (*function)(s7_scheme *sc, uint8_t c, s7_pointer port));  
@@ -911,6 +917,8 @@ typedef s7_double s7_Double;
  * 
  *        s7 changes
  * 
+ * 23-Sep:    s7_make_byte_vector, s7_is_byte_vector, s7_byte_vector_ref|set|elements.
+ * 25-Aug:    s7_output_string (like s7_get_output_string, but returns an s7 string).
  * 19-Jul:    s7_is_random_state, s7_make_normal_vector. s7_array_to_list.
  * 12-Apr:    s7_optimize now returns an s7_pfunc, not an s7_function.
  * 7-Apr:     removed the "args" parameter from s7_float_function. added s7_make_c_object_without_gc.

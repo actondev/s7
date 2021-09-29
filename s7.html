@@ -4021,7 +4021,12 @@ argument types.  #t means any type is possible, and 'values means the function r
 </pre>
 
 <p>which says that the first argument to char-position can be a string or a character,
-and the return type can be either boolean or an integer.
+and the return type can be either boolean or an integer.  If we know a function returns
+multiple values, the return type (first element of the signature) can contain a list 
+describing each such value: <code>(define (f x) (values (floor x) (ceiling x)))</code>
+could be <code>(((integer?) (integer?)) real?)</code>.
+</p>
+<p>
 If the function is defined in scheme, its signature is the value of the '+signature+ variable
 in its closure:
 </p>
@@ -5510,6 +5515,7 @@ history-enabled               is history buffer receiving additions (if WITH_HIS
 debug                         determines debugging level (see debug.scm), default=0
 profile                       profile switch (0=default, 1=gather profiling info)
 profile-info                  the current profiling data; see profile.scm
+profile-prefix                name (a symbol) used to identify the current environment in profile data
 
 default-rationalize-error     1e-12
 equivalent-float-epsilon      1e-15
@@ -5526,7 +5532,8 @@ undefined-constant-warnings   #f
 accept-all-keyword-arguments  #f 
 autoloading?                  #t
 openlets                      #t, whether any let can be open globally (this overrides all openlets)
-expansions?                   #t, whether expansions are handled at read-time 
+expansions?                   #t, whether expansions are handled at read-time
+muffle-warnings?              #f, if #t s7_warn does not output anything
 
 cpu-time                      run time so far
 file-names                    currently loaded files (a list)
@@ -5560,6 +5567,20 @@ Use the standard environment syntax to access these fields:
 <code>(*s7* 'stack-top)</code>.  stuff.scm has the function
 *s7*-&gt;list that returns most of these fields in a list.
 </p>
+<p>The compile-time defaults for some of these fields can be set:
+</p>
+<pre class="indented">
+heap-size:               INITIAL_HEAP_SIZE        (64000)
+stack-size:              INITIAL_STACK_SIZE       (4096)
+gc-temps-size:           GC_TEMPS_SIZE            (256)
+bignum-precision:        DEFAULT_BIGNUM_PRECISION (128)
+history-size:            DEFAULT_HISTORY_SIZE     (8)
+print-length:            DEFAULT_PRINT_LENGTH     (12)
+gc-resize-heap-fraction: GC_RESIZE_HEAP_FRACTION  (0.8)
+output-port-data-size:   OUTPUT_PORT_DATA_SIZE    (2048)
+
+See also WITH_WARNINGS, S7_ALIGNED, and GC_TRIGGER_SIZE.
+</pre>
 
 <p><code>(set! (*s7* 'autoloading) #f)</code> turns off the autoloader.
 </p>
@@ -6548,8 +6569,8 @@ Here are the diffs for the bench script:
 <p>
 I call the standalone version of s7 "repl", so its path
 is /home/bil/motif-snd/repl.  To build repl, get s7.tar.gz
-from https://ccrma.stanford.edu/software/s7/s7.tar.gz,
-add the empty file mus-config.h to the tarball's contents,
+from https://ccrma.stanford.edu/software/s7/s7.tar.gz;
+if not using gcc or clang, add the empty file mus-config.h to the tarball's contents,
 then (in Linux):
 </p>
 <pre>
@@ -6563,7 +6584,7 @@ mus-config.h normally has
 #define HAVE_COMPLEX_TRIG 1
 </pre>
 <p>
-but s7.c has defaults, so mus-config.h can be empty.
+but s7.c has defaults, so mus-config.h can be empty, or absent.
 Finally, go back to the benchmarks directory and
 </p>
 <pre>
@@ -6758,7 +6779,7 @@ int main(int argc, char **argv)
     }
 }
 
-/* make mus-config.h (it can be empty), then
+/* if not using gcc or clang, make mus-config.h (it can be empty), then
  *
  *   gcc -c s7.c -I.
  *   gcc -o repl repl.c s7.o -lm -I. -ldl
@@ -6889,9 +6910,7 @@ int main(int argc, char **argv)
 </p>
 
 <pre class="indented">
-in Linux: gcc s7.c -o repl -DWITH_MAIN -I. -O2 -g -ldl -lm -Wl,-export-dynamic -Wno-stringop-overflow
-in *BSD:  gcc s7.c -o repl -DWITH_MAIN -I. -O2 -g -lm -Wl,-export-dynamic
-in OSX:   gcc s7.c -o repl -DWITH_MAIN -I. -O2 -g -lm
+gcc -o nrepl s7.c -O2 -I. -Wl,-export-dynamic -lm -ldl -DWITH_MAIN -DWITH_NOTCURSES -lnotcurses-core
 </pre>
 
 
@@ -8967,7 +8986,8 @@ and treats it as if it were the contents of a file of scheme code.  So, unlike s
 multiple statements, and things like double-quote don't need to be quoted.  nrepl.c for example
 embeds the contents of nrepl.scm at compile time, then calls s7_load_c_string at program startup.  It also
 includes notcurses_s7.c.  The end result is a stand-alone program that doesn't need to load either nrepl.scm
-or notcurses_s7.so.
+or notcurses_s7.so.  The "content" argument should be a null-terminated C string. The "bytes" argument 
+is the contents length, not including the trailing null, as in strlen.  There are simple examples in ffitest.c.
 </p>
 
 <blockquote>
@@ -9402,7 +9422,7 @@ bool s7_is_input_port(s7_scheme *sc, s7_pointer p);
 bool s7_is_output_port(s7_scheme *sc, s7_pointer p);
 void s7_close_input_port(s7_scheme *sc, s7_pointer p);
 void s7_close_output_port(s7_scheme *sc, s7_pointer p);
-void s7_flush_output_port(s7_scheme *sc, s7_pointer p);
+bool s7_flush_output_port(s7_scheme *sc, s7_pointer p); /* false=flush lost data */
 const char *s7_port_filename(s7_scheme *sc, s7_pointer x);
 s7_int s7_port_line_number(s7_scheme *sc, s7_pointer p);
 
@@ -9412,6 +9432,7 @@ s7_pointer s7_open_output_file(s7_scheme *sc, const char *name, const char *mode
 s7_pointer s7_open_input_string(s7_scheme *sc, const char *input_string);  
 s7_pointer s7_open_output_string(s7_scheme *sc);
 const char *s7_get_output_string(s7_scheme *sc, s7_pointer out_port);
+s7_pointer s7_output_string(s7_scheme *sc, s7_pointer out_port);
 
 typedef enum {S7_READ, S7_READ_CHAR, S7_READ_LINE, S7_PEEK_CHAR, S7_IS_CHAR_READY, S7_NUM_READ_CHOICES} s7_read_t;
 s7_pointer s7_open_output_function(s7_scheme *sc, void (*function)(s7_scheme *sc, uint8_t c, s7_pointer port));  
@@ -9441,6 +9462,8 @@ returns the file associated with a file port.  s7_port_line_number returns posit
 reader in an input file port.  The "use_write" parameter to s7_object_to_string refers
 to the write/display choice in scheme.  The string returned by s7_object_to_c_string
 should be freed by the caller.
+s7_output_string is the same as s7_get_output_string except that it returns an s7 string,
+not a C string.
 </p>
 <p>s7_open_input_function and s7_open_output_function
 call their "function" argument when input or output is requested.  The "read_choice"
@@ -10845,7 +10868,7 @@ Eventually I'll probably retire repl.scm.
 <p>Unlike repl, nrepl has support for the mouse, traversable, scrollable, and resizable panes, built-in ties to
 lint.scm, debug.scm, and profile.scm, and various other enhancements.
 Since it includes all the libc, notcurses FFI code, and nrepl.scm at compile-time, there
-are no problems running it anywhere.  To build nrepl: touch mus-config.h, then
+are no problems running it anywhere.  To build nrepl:
 </p>
 <pre class="indented">
 gcc -o nrepl s7.c -O2 -I. -Wl,-export-dynamic -lm -ldl -DWITH_MAIN -DWITH_NOTCURSES -lnotcurses-core

@@ -1,3 +1,5 @@
+/* gcc -o repl repl.c s7.o -Wl,-export-dynamic -lm -I. -ldl */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -51,7 +53,6 @@ int main(int argc, char **argv)
   s7_scheme *sc;
 
   sc = s7_init();
-
   if (argc >= 2)
     {
       if (strcmp(argv[1], "-e") == 0)         /* repl -e '(+ 1 2)' */
@@ -67,9 +68,10 @@ int main(int argc, char **argv)
 	  return(0);
 	}
       fprintf(stderr, "load %s\n", argv[1]);  /* repl test.scm */
+      errno = 0;
       if (!s7_load(sc, argv[1]))
 	{
-	  fprintf(stderr, "can't load %s\n", argv[1]);
+	  fprintf(stderr, "%s: %s\n", strerror(errno), argv[1]);
 	  return(2);
 	}
     }
@@ -108,6 +110,3 @@ int main(int argc, char **argv)
     }
   return(0);
 }
-
-/* gcc -o repl repl.c s7.o -Wl,-export-dynamic -lm -I. -ldl
- */

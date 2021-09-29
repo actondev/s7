@@ -18,7 +18,7 @@
 
 #include "s7.h"
 
-#define print_s7_int PRId64
+#define ld64 PRId64
 
 #define TO_STR(x) s7_object_to_c_string(sc, x)
 #define TO_S7_INT(x) s7_make_integer(sc, x)
@@ -789,7 +789,7 @@ int main(int argc, char **argv)
 
   i = (*((int *)s7_c_pointer(p)));
   if (i != 32)
-    fprintf(stderr, "%d: 32 -> %" print_s7_int " via raw c pointer?\n", __LINE__, i);
+    fprintf(stderr, "%d: 32 -> %" ld64 " via raw c pointer?\n", __LINE__, i);
 
   s7_provide(sc, "ffitest");
   if (!s7_is_provided(sc, "ffitest"))
@@ -798,7 +798,7 @@ int main(int argc, char **argv)
   p = s7_cons(sc, s7_f(sc), s7_t(sc));
   gc_loc = s7_gc_protect(sc, p);
   if (p != s7_gc_protected_at(sc, gc_loc))
-    {fprintf(stderr, "%d: %s is not gc protected at %" print_s7_int ": %s?\n", __LINE__, s1 = TO_STR(p), gc_loc, s2 = TO_STR(s7_gc_protected_at(sc, gc_loc))); free(s1); free(s2);}
+    {fprintf(stderr, "%d: %s is not gc protected at %" ld64 ": %s?\n", __LINE__, s1 = TO_STR(p), gc_loc, s2 = TO_STR(s7_gc_protected_at(sc, gc_loc))); free(s1); free(s2);}
   
   if (s7_car(p) != s7_f(sc))
     {fprintf(stderr, "%d: (car %s) is not #f?\n", __LINE__, s1 = TO_STR(p)); free(s1);}
@@ -1028,16 +1028,17 @@ int main(int argc, char **argv)
     s7_int* dims;
     s7_pointer p;
     s7_double *els;
+    uint8_t *bels;
     dims = (s7_int *)malloc(2 * sizeof(s7_int));
     dims[0] = 2;
     dims[1] = 3;
+
     p = s7_make_int_vector(sc, 6, 2, dims);
     if (s7_vector_rank(p) != 2) fprintf(stderr, "int vector rank not 2?\n");
     p = s7_make_float_vector(sc, 6, 2, dims);
     if (s7_vector_rank(p) != 2) fprintf(stderr, "float vector rank not 2?\n");
     if (s7_vector_dimension(p, 0) != 2) fprintf(stderr, "%d: s7_vector_dimension 0: %ld\n", __LINE__, s7_vector_dimension(p, 0));
     if (s7_vector_dimension(p, 1) != 3) fprintf(stderr, "%d: s7_vector_dimension 1: %ld\n", __LINE__, s7_vector_dimension(p, 1));
-    free(dims); /* ?? */
 
     p = s7_make_float_vector(sc, 6, 1, NULL);
     s7_float_vector_set(p, 1, 32.0);
@@ -1045,6 +1046,14 @@ int main(int argc, char **argv)
     els = s7_float_vector_elements(p);
     if (els[1] != 32.0) fprintf(stderr, "float_vector els[1] not 32.0?\n");
     if (!s7_is_float_vector(p)) fprintf(stderr, "not a float_vector?\n");
+
+    p = s7_make_byte_vector(sc, 6, 2, dims);
+    s7_byte_vector_set(p, 1, 32);
+    if (s7_byte_vector_ref(p, 1) != 32) fprintf(stderr, "byte_vector[1] not 32?\n");
+    bels = s7_byte_vector_elements(p);
+    if (bels[1] != 32) fprintf(stderr, "byte_vector bels[1] not 32?\n");
+    if (!s7_is_byte_vector(p)) fprintf(stderr, "not a byte_vector?\n");
+    free(dims); /* ?? */
   }
 
   {
@@ -1612,7 +1621,7 @@ int main(int argc, char **argv)
 						    s7_make_integer(sc, 5),
 						    s7_make_integer(sc, 6))));
     if (val != 21)
-      fprintf(stderr, "plus1: %" print_s7_int "\n", val);
+      fprintf(stderr, "plus1: %" ld64 "\n", val);
 
     p = s7_make_c_object_without_gc(sc, dax_type_tag, (void *)malloc(sizeof(dax)));
     {
@@ -1784,11 +1793,11 @@ int main(int argc, char **argv)
     s7_vector_offsets(p1, offs, ndims);
     els = s7_vector_elements(p1);
 
-    if (dims[0] != 2) fprintf(stderr, "%d: dims[0]: %" print_s7_int "?\n", __LINE__, dims[0]);
-    if (dims[1] != 3) fprintf(stderr, "%d: dims[1]: %" print_s7_int "?\n", __LINE__, dims[1]);
-    if (dims[2] != 4) fprintf(stderr, "%d: dims[2]: %" print_s7_int "?\n", __LINE__, dims[2]);
-    if (offs[0] != 12) fprintf(stderr, "%d: offs[0]: %" print_s7_int "?\n", __LINE__, offs[0]);
-    if (offs[1] != 4) fprintf(stderr, "%d: offs[1]: %" print_s7_int "?\n", __LINE__, offs[1]);
+    if (dims[0] != 2) fprintf(stderr, "%d: dims[0]: %" ld64 "?\n", __LINE__, dims[0]);
+    if (dims[1] != 3) fprintf(stderr, "%d: dims[1]: %" ld64 "?\n", __LINE__, dims[1]);
+    if (dims[2] != 4) fprintf(stderr, "%d: dims[2]: %" ld64 "?\n", __LINE__, dims[2]);
+    if (offs[0] != 12) fprintf(stderr, "%d: offs[0]: %" ld64 "?\n", __LINE__, offs[0]);
+    if (offs[1] != 4) fprintf(stderr, "%d: offs[1]: %" ld64 "?\n", __LINE__, offs[1]);
     if (s7_integer(p = els[12 + 4 + 1]) != 32)
       {fprintf(stderr, "%d: %s is not 32?\n", __LINE__, s1 = TO_STR(p)); free(s1);}
 
@@ -1836,7 +1845,7 @@ int main(int argc, char **argv)
     if (p != s7_f(sc))
       {fprintf(stderr, "%d: set slot-value %s is not #f?\n", __LINE__, s1 = TO_STR(p)); free(s1);}
 
-    if (s7_outlet(sc, new_env) != old_env)
+    if ((s7_outlet(sc, new_env) != old_env) && (old_env != s7_nil(sc)))
       {fprintf(stderr, "%d: outer-env %s?\n", __LINE__, s1 = TO_STR(old_env)); free(s1);}
 
     s7_make_slot(sc, new_env, s7_make_symbol(sc, "var2"), TO_S7_INT(-1));
@@ -1854,7 +1863,7 @@ int main(int argc, char **argv)
       int gloc;
       gloc = s7_gc_protect(sc, p);
       s1 = TO_STR(p);
-      if (strcmp(s1, "((var1 . #f) (var2 . #t))") != 0)
+      if (strcmp(s1, "((var2 . #t) (var1 . #f))") != 0)
 	{fprintf(stderr, "%d: env->list: %s\n", __LINE__, s1);}
       free(s1);
       s7_gc_unprotect_at(sc, gloc);
@@ -2089,9 +2098,14 @@ int main(int argc, char **argv)
     s7_display(sc, s7_make_string(sc, "(+ 2 3)"), port);
     {
       const char *s2;
+      s7_pointer s3;
       s2 = s7_get_output_string(sc, port);
       if (strcmp(s2, "(+ 2 3)") != 0)
-	{fprintf(stderr, "%d: read output string sees %s?\n", __LINE__, s2);}
+	{fprintf(stderr, "%d: s7_get_output_string returns %s?\n", __LINE__, s2);}
+      s3 = s7_output_string(sc, port);
+      if ((!s7_is_string(s3)) ||
+	  (strcmp(s7_string(s3), "(+ 2 3)") != 0))
+	{fprintf(stderr, "%d: s7_output_string returns %s?\n", __LINE__, s2);}
     }
     s7_close_output_port(sc, port);
     s7_gc_unprotect_at(sc, gc_loc);
@@ -2328,9 +2342,9 @@ int main(int argc, char **argv)
       {fprintf(stderr, "%d: g_block %s is not a c_object?\n", __LINE__, s1 = TO_STR(gp)); free(s1);}
     g = (g_block *)s7_c_object_value(gp);
     if (s7_c_object_type(gp) != g_block_type)
-      {fprintf(stderr, "%d: g_block types: %" print_s7_int " %" print_s7_int "\n", __LINE__, g_block_type, s7_c_object_type(gp));}
+      {fprintf(stderr, "%d: g_block types: %" ld64 " %" ld64 "\n", __LINE__, g_block_type, s7_c_object_type(gp));}
     if (s7_c_object_value_checked(gp, g_block_type) != g)
-      {fprintf(stderr, "%d: checked g_block types: %" print_s7_int " %" print_s7_int "\n", __LINE__, g_block_type, s7_c_object_type(gp));}
+      {fprintf(stderr, "%d: checked g_block types: %" ld64 " %" ld64 "\n", __LINE__, g_block_type, s7_c_object_type(gp));}
     if (s7_c_object_let(gp) != g_block_methods)
       fprintf(stderr, "%d: s7_c_object_let trouble\n", __LINE__);
     s7_gc_unprotect_at(sc, gc_loc);

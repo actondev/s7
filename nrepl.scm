@@ -17,11 +17,17 @@
 (unless (defined? 'nccell_stylemask)   (define nccell_stylemask cell_stylemask))
 (unless (defined? 'nccells_double_box) (define nccells_double_box cells_double_box))
 
+(unless (defined? 'CELL_FGDEFAULT_MASK) (define CELL_FGDEFAULT_MASK NC_FGDEFAULT_MASK))
+(unless (defined? 'CELL_BGDEFAULT_MASK) (define CELL_BGDEFAULT_MASK NC_BGDEFAULT_MASK))
+
+(unless (defined? 'notcurses_getc) (define (notcurses_getc a b c d) (notcurses_get a b d)))
+
 (define (drop-into-repl call e)
   ((*nrepl* 'run) "break>" (object->string call) e))
 
 (define (display-debug-info cint) #f) ; replaced later
 (define (remove-watcher var) #f)
+(define (nrepl-lookup symbol) (((*nrepl* 'top-level-let) 'run-let) symbol))
 
 (define (debug.scm-init)
   (set! (debug-repl)
@@ -77,6 +83,7 @@
 	      :ncp-let #f
 	      :display-status #f
 	      :status-text ""
+	      :run-let #f
 
 	      :s7-version (lambda () (*s7* 'version))
 
@@ -144,7 +151,7 @@
 					       result))))))
 			     (make-iterator iterloop))))))
 
-		(lambda* (name (e (*nrepl* 'top-level-let)))
+		(lambda* (name (e (sublet (*nrepl* 'top-level-let) *notcurses*)))
 		  (let ((ap-name (if (string? name) name
 				     (if (symbol? name)
 					 (symbol->string name)
@@ -344,6 +351,7 @@
 				     (if (and wc (= y (+ watch-row 1)))
 					 (min (- watch-col 1) (+ x ncp-col))
 					 (+ x ncp-col))))
+	  (set! (top-level-let :run-let) (curlet))
 	  (when header
 	    (set! hc-cells (vector (nccell_make) (nccell_make) (nccell_make) (nccell_make) (nccell_make) (nccell_make)))
 	    (let ((newline-pos (char-position #\newline header)))
@@ -397,6 +405,12 @@
 	      (set! (nccell_channels c1) 0)
 	      (set! (nccell_stylemask c1) 0)
 	      (ncplane_set_base_cell ncp c1)
+
+	      (unless header
+		(set! header-row 1)
+		(set! row 1)
+		(set! header-cols nc-cols))
+
 	      (notcurses_render nc))
 
 	    (let ((last-name ""))
@@ -597,16 +611,17 @@
 	    ;; we load lint above, at which time it sets its *output-port* to *stderr* (the global built-in port), but
 	    ;;   when called in the repl, we have over-ridden *stderr* to place that output in the notcurses display,
 	    ;;   so we need to redirect lint's output by hand.
-	    (set! lint ; force top-level change
-	      (let ((old-lint lint))
-		(lambda* (file (outp :unset) (report-input :unset))
-		  (if (and (eq? outp :unset)
-			   (eq? report-input :unset))
-		      (nc-multiline-display
-		       (call-with-output-string
-			(lambda (p)
-			  (old-lint file p))))
-		      (old-lint file outp report-input)))))
+	    (when with-lint
+	      (set! lint ; force top-level change
+		    (let ((old-lint lint))
+		      (lambda* (file (outp :unset) (report-input :unset))
+			(if (and (eq? outp :unset)
+				 (eq? report-input :unset))
+			    (nc-multiline-display
+			     (call-with-output-string
+			      (lambda (p)
+				(old-lint file p))))
+			    (old-lint file outp report-input))))))
 
 
 	    ;; -------- top-level-let --------
@@ -976,7 +991,7 @@
                       (previously-selected #f)
                       (just-selected #f)
 		      (control-key (ash 1 33))
-                      (meta-key (ash 1 34)))    ; notcurses getc returns 32 bits
+                      (meta-key (ash 1 34)))    ; notcurses get returns 32 bits
 
 		  (set! (top-level-let 'ncp-let) (curlet))
 		  (set! display-debug-info local-debug-info)
@@ -1169,7 +1184,7 @@
                       (set! just-selected #t)))
                   (define (char-separator? c)
                     (char-position c " ()`',\"#"))
-                  (define (word-back-x)
+                  (define (word-back-x) ;; some of these are courtesy of Elijah Stone
                     (let loop ((col (max (bols row) (- col 1))))
                       (if (= col (bols row))
 			  col
@@ -1354,14 +1369,14 @@
 				(set! bols (copy bols (make-int-vector ncp-rows)))
 				(set! eols (copy eols (make-int-vector ncp-rows))))
 
-				(do ((i (+ ncp-max-row 1) (- i 1)))
-				    ((= i (+ row 1))
-				     (set! ncp-max-row (+ ncp-max-row 1)))
-				  (let ((contents (ncplane_contents ncp (- i 1) 0 1 (eols (- i 1)))))
-				    (clear-line i)
-				    (nc-display i 0 contents)) ; should this be indented?
-				  (set! (eols i) (eols (- i 1)))
-				  (set! (bols i) (bols (- i 1)))))
+			      (do ((i (+ ncp-max-row 1) (- i 1)))
+				  ((= i (+ row 1))
+				   (set! ncp-max-row (+ ncp-max-row 1)))
+				(let ((contents (ncplane_contents ncp (- i 1) 0 1 (eols (- i 1)))))
+				  (clear-line i)
+				  (nc-display i 0 contents)) ; should this be indented?
+				(set! (eols i) (eols (- i 1)))
+				(set! (bols i) (bols (- i 1)))))
 
 			    (nc-display row col (make-string (- (eols row) col) #\space))
 			    (set! (eols row) col)

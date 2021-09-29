@@ -652,7 +652,29 @@
 	    lst v))
 (f27 lst nv)
 
+(define (f28)
+  (do ((p lst (cdr p))
+       (i 0 (+ i 1)))
+      ((null? p))
+    (set-car! p i))
+  (map + lst lst))
+(f28)
+
+(define (f29)
+  (let ((str (make-string 100 #\a)))
+    (set! (str 50) #\b)
+    (do ((i 0 (+ i 1)))
+	((= i 30000))
+      (map char->integer str))))
+(f29)
+
+(define (f30)
+  (do ((i 0 (+ i 1)))
+      ((= i 30))
+    (map pair? lst)))
+(f30)
+
+(newline)
 (when (> (*s7* 'profile) 0)
   (show-profile 200))
 (exit)
-

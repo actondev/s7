@@ -38,14 +38,12 @@
 
 #include "s7.h"
 
-#if (!S7_MAIN)
 static s7_int s7_integer_checked(s7_scheme *sc, s7_pointer val)
 {
   if (!s7_is_integer(val))
     s7_wrong_type_arg_error(sc, __func__, 0, val, "an integer");
   return(s7_integer(val));
 }
-#endif
 
 static s7_double s7_real_checked(s7_scheme *sc, s7_pointer val)
 {
@@ -176,6 +174,17 @@ static s7_pointer g_ncdirect_inputready_fd(s7_scheme *sc, s7_pointer args)
   return(s7_make_integer(sc, ncdirect_inputready_fd((struct ncdirect *)s7_c_pointer_with_type(sc, s7_car(args), ncdirect_symbol, __func__, 1))));
 }
 
+
+#if (NC_CURRENT_VERSION >= NC_VERSION(2, 3, 12))
+static s7_pointer g_ncdirect_get(s7_scheme *sc, s7_pointer args)
+{
+  /* returns char32_t! */
+  return(s7_make_integer(sc, ncdirect_get((struct ncdirect *)s7_c_pointer_with_type(sc, s7_car(args), ncdirect_symbol, __func__, 1),
+					   (const struct timespec *)s7_c_pointer_with_type(sc, s7_cadr(args), timespec_symbol, __func__, 2), 
+					   (ncinput *)s7_c_pointer_with_type(sc, s7_caddr(args), ncinput_symbol, __func__, 3))));
+				    
+}
+#else
 static s7_pointer g_ncdirect_getc(s7_scheme *sc, s7_pointer args)
 {
   /* returns char32_t! */
@@ -185,6 +194,7 @@ static s7_pointer g_ncdirect_getc(s7_scheme *sc, s7_pointer args)
 					   (ncinput *)s7_c_pointer_with_type(sc, s7_cadddr(args), ncinput_symbol, __func__, 4))));
 				    
 }
+#endif
 
 static s7_pointer g_ncdirect_set_fg_default(s7_scheme *sc, s7_pointer args)
 {
@@ -733,6 +743,14 @@ static s7_pointer g_notcurses_canutf8(s7_scheme *sc, s7_pointer args)
   return(s7_make_boolean(sc, notcurses_canutf8((const struct notcurses *)s7_c_pointer_with_type(sc, s7_car(args), notcurses_symbol, __func__, 1))));
 }
 
+#if (NC_CURRENT_VERSION >= NC_VERSION(2, 3, 12))
+static s7_pointer g_notcurses_get(s7_scheme *sc, s7_pointer args)
+{
+  return(s7_make_integer(sc, notcurses_get((struct notcurses *)s7_c_pointer_with_type(sc, s7_car(args), notcurses_symbol, __func__, 1),
+					      (const struct timespec *)s7_c_pointer_with_type(sc, s7_cadr(args), timespec_symbol, __func__, 2), 
+					      (ncinput *)s7_c_pointer_with_type(sc, s7_caddr(args), ncinput_symbol, __func__, 3))));
+}
+#else
 static s7_pointer g_notcurses_getc(s7_scheme *sc, s7_pointer args)
 {
   return(s7_make_integer(sc, notcurses_getc((struct notcurses *)s7_c_pointer_with_type(sc, s7_car(args), notcurses_symbol, __func__, 1),
@@ -740,6 +758,7 @@ static s7_pointer g_notcurses_getc(s7_scheme *sc, s7_pointer args)
 					      (sigset_t *)s7_c_pointer_with_type(sc, s7_caddr(args), sigset_t_symbol, __func__, 3),
 					      (ncinput *)s7_c_pointer_with_type(sc, s7_cadddr(args), ncinput_symbol, __func__, 4))));
 }
+#endif
 
 static s7_pointer g_notcurses_refresh(s7_scheme *sc, s7_pointer args)
 {
@@ -3545,11 +3564,6 @@ static s7_pointer g_ncvisual_decode(s7_scheme *sc, s7_pointer args)
   return(s7_make_integer(sc, ncvisual_decode((struct ncvisual *)s7_c_pointer_with_type(sc, s7_car(args), ncvisual_symbol, __func__, 1))));
 }
 
-static s7_pointer g_ncvisual_subtitle(s7_scheme *sc, s7_pointer args)
-{
-  return(s7_make_string(sc, ncvisual_subtitle((const struct ncvisual *)s7_c_pointer_with_type(sc, s7_car(args), ncvisual_symbol, __func__, 1))));
-}
-
 static s7_pointer g_ncvisual_rotate(s7_scheme *sc, s7_pointer args)
 {
   return(s7_make_integer(sc, ncvisual_rotate((struct ncvisual *)s7_c_pointer_with_type(sc, s7_car(args), ncvisual_symbol, __func__, 1), 
@@ -3828,7 +3842,15 @@ void notcurses_s7_init(s7_scheme *sc)
   nc_int(NCOPTION_SUPPRESS_BANNERS);
   nc_int(NCOPTION_NO_ALTERNATE_SCREEN);
   nc_int(NCOPTION_NO_FONT_CHANGES);
+#if (NC_CURRENT_VERSION > NC_VERSION(2, 3, 6))
+  nc_int(NCOPTION_PRESERVE_CURSOR);
+#endif
 
+#if (NC_CURRENT_VERSION > NC_VERSION(2, 3, 10))
+  nc_int(NCPLANE_OPTION_FIXED);
+#endif
+
+#if (NC_CURRENT_VERSION < NC_VERSION(2, 3, 5))
   nc_int(CELL_BGDEFAULT_MASK);
   nc_int(CELL_FGDEFAULT_MASK);
   nc_int(CELL_BG_RGB_MASK);
@@ -3842,17 +3864,33 @@ void notcurses_s7_init(s7_scheme *sc)
   nc_int(CELL_ALPHA_TRANSPARENT);
   nc_int(CELL_ALPHA_BLEND);
   nc_int(CELL_ALPHA_OPAQUE);
+#else
+  nc_int(NC_BGDEFAULT_MASK);
+  nc_int(NC_FGDEFAULT_MASK);
+  nc_int(NC_BG_RGB_MASK);
+  nc_int(NC_FG_RGB_MASK);
+  nc_int(NC_BG_PALETTE);
+  nc_int(NC_FG_PALETTE);
+  nc_int(NC_BG_ALPHA_MASK);
+  nc_int(NC_FG_ALPHA_MASK);
 
+  nc_int(NCALPHA_HIGHCONTRAST);
+  nc_int(NCALPHA_TRANSPARENT);
+  nc_int(NCALPHA_BLEND);
+  nc_int(NCALPHA_OPAQUE);
+#endif
   nc_int(NCPLANE_OPTION_HORALIGNED);
 
   nc_int(NCSTYLE_MASK);
+#if (NC_CURRENT_VERSION < NC_VERSION(2, 4, 0))
   nc_int(NCSTYLE_STANDOUT);
-  nc_int(NCSTYLE_UNDERLINE);
   nc_int(NCSTYLE_REVERSE);
   nc_int(NCSTYLE_BLINK);
+  nc_int(NCSTYLE_INVIS);
+#endif
+  nc_int(NCSTYLE_UNDERLINE);
   nc_int(NCSTYLE_DIM);
   nc_int(NCSTYLE_BOLD);
-  nc_int(NCSTYLE_INVIS);
   nc_int(NCSTYLE_PROTECT);
   nc_int(NCSTYLE_ITALIC);
   nc_int(NCSTYLE_STRUCK);
@@ -3993,7 +4031,11 @@ void notcurses_s7_init(s7_scheme *sc)
   nc_func(ncdirect_palette_size, 1, 0, false);
   nc_func(ncdirect_flush, 1, 0, false);
   nc_func(ncdirect_inputready_fd, 1, 0, false);
+#if (NC_CURRENT_VERSION >= NC_VERSION(2, 3, 12))
+  nc_func(ncdirect_get, 3, 0, false);
+#else
   nc_func(ncdirect_getc, 4, 0, false);
+#endif
   nc_func(ncdirect_dim_x, 1, 0, false);
   nc_func(ncdirect_dim_y, 1, 0, false);
   nc_func(ncdirect_cursor_enable, 1, 0, false);
@@ -4064,7 +4106,11 @@ void notcurses_s7_init(s7_scheme *sc)
   nc_func(notcurses_stdplane_const, 1, 0, false);
   nc_func(notcurses_cursor_enable, 3, 0, false);
   nc_func(notcurses_cursor_disable, 1, 0, false);
+#if (NC_CURRENT_VERSION >= NC_VERSION(2, 3, 12))
+  nc_func(notcurses_get, 3, 0, false);
+#else
   nc_func(notcurses_getc, 4, 0, false);
+#endif
   nc_func(notcurses_refresh, 1, 0, false);
   nc_func(notcurses_at_yx, 5, 0, false);
   nc_func(notcurses_lex_margins, 2, 0, false);
@@ -4422,7 +4468,6 @@ void notcurses_s7_init(s7_scheme *sc)
   nc_func(ncvisual_from_plane, 6, 0, false);
   nc_func(ncvisual_destroy, 1, 0, false);
   nc_func(ncvisual_decode, 1, 0, false);
-  nc_func(ncvisual_subtitle, 1, 0, false);
   nc_func(ncvisual_rotate, 2, 0, false);
   nc_func(ncvisual_resize, 3, 0, false);
   nc_func(ncvisual_polyfill_yx, 4, 0, false);
@@ -4487,7 +4532,7 @@ void notcurses_s7_init(s7_scheme *sc)
 
 #if 0
 /* gcc -fPIC -c notcurses_s7.c
- * gcc notcurses_s7.o -shared -o notcurses_s7.so -lnotcurses
+ * gcc notcurses_s7.o -shared -o notcurses_s7.so -lnotcurses-core
  * repl
  *   > (load "notcurses_s7.so" (inlet 'init_func 'notcurses_s7_init))
  *   > (notcurses_version)
