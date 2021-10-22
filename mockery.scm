@@ -304,7 +304,7 @@
 						   (with-mock-wrapper #_length))
 
 		       'string-append          (with-mock-wrapper* #_string-append)
-		       'string-copy            (with-mock-wrapper #_copy) ; new form -> with-mock-wrapper* ? 
+		       'string-copy            (with-mock-wrapper* #_string-copy)
 		       
 		       'string=?               (with-mock-wrapper* #_string=?)
 		       'string<?               (with-mock-wrapper* #_string<?)
@@ -315,7 +315,7 @@
 		       'string-downcase        (with-mock-wrapper #_string-downcase)
 		       'string-upcase          (with-mock-wrapper #_string-upcase)
 		       'string->symbol         (with-mock-wrapper #_string->symbol)
-		       'symbol                 (with-mock-wrapper #_symbol)
+		       'symbol                 (with-mock-wrapper* #_symbol)
 		       'string->keyword        (with-mock-wrapper #_string->keyword)
 		       'open-input-string      (with-mock-wrapper #_open-input-string)
 		       'directory?             (with-mock-wrapper #_directory?)
@@ -336,7 +336,7 @@
 		       'load                   (with-mock-wrapper* #_load)
 		       'eval-string            (with-mock-wrapper* #_eval-string)
 		       'string->list           (with-mock-wrapper* #_string->list)
-		       'bignum                 (with-mock-wrapper #_bignum)
+		       'bignum                 (with-mock-wrapper* #_bignum)
 		       'fill!                  (with-mock-wrapper* #_fill!)
 		       'write-string           (with-mock-wrapper* #_write-string)
 		       'copy                   (with-mock-wrapper* #_copy)
@@ -449,7 +449,7 @@
 		  (sublet (*mock-char* 'mock-char-class)
 		    'value c
 		    'mock-type 'mock-char?)))
-		(error 'wrong-type-arg "mock-char arg ~S is not a char" c)))
+		(error 'wrong-type-arg "mock-char argument ~S is not a char" c)))
 	  
 	  (set! mock-char? (lambda (obj)
 			     (and (let? obj)
@@ -525,6 +525,8 @@
 		 'real?            (with-mock-wrapper #_real?)
 		 'complex?         (with-mock-wrapper #_complex?)
 		 'rational?        (with-mock-wrapper #_rational?)
+		 'byte?            (with-mock-wrapper #_byte?)
+		 'float?           (with-mock-wrapper #_float?)
 		 'exact?           (with-mock-wrapper #_exact?)
 		 'inexact?         (with-mock-wrapper #_inexact?)
 		 'lognot           (with-mock-wrapper #_lognot)
@@ -598,7 +600,6 @@
 		 'subvector        (with-mock-wrapper* #_subvector)
 		 'read-string      (with-mock-wrapper* #_read-string)
 		 'length           (with-mock-wrapper #_length)
-		 'number?          (with-mock-wrapper #_number?)
 		 'class-name       '*mock-number*)))
 	  
 	  (define (mock-number x)
@@ -796,7 +797,7 @@
 								(#_list-ref (obj 'value) ind))))
 						     (openlet obj) 
 						     val)
-						   (error "let-ref mock-pair index is not an integer: ~S" ind))))
+						   (error 'wrong-type-arg "let-ref mock-pair index is not an integer: ~S" ind))))
 		       'let-set-fallback (lambda (obj ind val) 
 					   (if (eq? ind 'value)
 					       #<undefined>
@@ -806,7 +807,7 @@
 								(#_list-set! (obj 'value) ind val))))
 						     (openlet obj)
 						     val)
-						   (error "let-set! mock-pair index is not an integer: ~S" ind))))
+						   (error 'wrong-type-arg "let-set! mock-pair index is not an integer: ~S" ind))))
 		       
 		       'reverse!         (lambda (obj) 
 					   (if (mock-pair? obj)
@@ -888,10 +889,10 @@
 		       'symbol->string        (with-mock-wrapper #_symbol->string)
 		       'symbol->value         (with-mock-wrapper* #_symbol->value)
 		       'symbol->dynamic-value (with-mock-wrapper #_symbol->dynamic-value)
-		       'setter                (with-mock-wrapper #_setter)
+		       'setter                (with-mock-wrapper* #_setter)
 		       'provided?             (with-mock-wrapper #_provided?)
 		       'provide               (with-mock-wrapper #_provide)
-		       'defined?              (with-mock-wrapper #_defined?)
+		       'defined?              (with-mock-wrapper* #_defined?)
 		       'symbol->keyword       (with-mock-wrapper #_symbol->keyword)
 		       'keyword?              (with-mock-wrapper #_keyword?)
 		       'keyword->symbol       (with-mock-wrapper #_keyword->symbol)

@@ -250,11 +250,11 @@
 (define (mv8)
   (+ (values 1 2 3) (values 3 -2 -1)))
 (define (mv9)
-  (+ (abs -1) (values 2 3 4) -4))
+  (+ 1 (values 2 3 4) -4))
 (define (mv10)
   (+ (values 1 2 3)))
 (define (mv11)
-  (+ (abs -1) (values -1 2 4)))
+  (+ 1 (values -1 2 4)))
 (define (mv12 x y)
   (+ x y (values 2 3 4)))
 
@@ -384,22 +384,24 @@
 
 ;;; -------- methods --------
 
-(define (m5)
-  (let ((L (openlet (inlet :length (lambda (str) (+ 2 (#_string-length "asdfghjklijk")))))))
-    (do ((i 0 (+ i 1)))
-	((= i 1000000) (length L))
-      (length L))))
+(unless (provided? 'pure-s7)
 
-(unless (eqv? (m5) 14) (format *stderr* "m5: ~S~%" (m5)))
-
-(define (m6)
-  (let ((L (openlet (inlet :length (lambda (str) (+ 2 (#_string-length str)))))))
-    (do ((i 0 (+ i 1)))
-	((= i 1000000) (with-let L (length "asdfghjklijk")))
-      (with-let L
-	(length "asdfghjklijk")))))
-
-(unless (eqv? (m6) 14) (format *stderr* "m6: ~S~%" (m6)))
+  (define (m5 str)
+    (let ((L (openlet (inlet :length (lambda (s) (+ 2 (#_string-length str)))))))
+      (do ((i 0 (+ i 1)))
+	  ((= i 1000000) (length L))
+	(length L))))
+  
+  (unless (eqv? (m5 "asdfghjklijk") 14) (format *stderr* "m5: ~S~%" (m5 "asdfghjklijk")))
+  
+  (define (m6 str)
+    (let ((L (openlet (inlet :str str :length (lambda (s) (+ 2 (#_string-length s)))))))
+      (do ((i 0 (+ i 1)))
+	  ((= i 1000000) (with-let L (length str)))
+	(with-let L
+	  (length str)))))
+  
+  (unless (eqv? (m6 "asdfghjklijk") 14) (format *stderr* "m6: ~S~%" (m6 "asdfghjklijk"))))
 
 (define (m7)
   (let ((L (openlet (inlet :+ (lambda (x y) (#_+ x y 1))))))

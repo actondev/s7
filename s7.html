@@ -3667,7 +3667,7 @@ notices it has exceeded this limit, it returns the partial string.
 ~S        object-&gt;string as in write
 ~B        number-&gt;string in base 2
 ~O        number-&gt;string in base 8
-~D        number-&gt;string in base 10
+~D        number-&gt;string in base 10 (~:D for ordinal)
 ~X        number-&gt;string in base 16
 ~E        float to string, (format #f "~E" 100.1) -&gt; "1.001000e+02", (%e in C)
 ~F        float to string, (format #f "~F" 100.1) -&gt; "100.100000",   (%f in C)
@@ -4414,7 +4414,9 @@ via the error function, and can be trapped and dealt with via <em class=def id="
 <p>
 catch has 3 arguments: a tag indicating what error to catch (#t = anything),
 the code, a thunk, that the catch is protecting, and the function to call
-if a matching error occurs during the evaluation of the thunk.  The error handler
+if a matching error occurs during the evaluation of the thunk.  
+The tag is matched to the error type with eq?.
+The error handler
 takes a rest argument which will hold whatever the error function chooses to pass it.
 The error function itself takes at least 2 arguments, the error type, a symbol,
 and the error message.  There may also be other arguments describing the error.
