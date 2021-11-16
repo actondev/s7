@@ -4627,8 +4627,7 @@ To list all the local bindings from the error outward:
   (format () "~{~A ~}~%" e))
 </pre>
 
-<p>To see the current s7 stack, <code>(stacktrace)</code>.  You'll probably
-want to use this in conjunction with *error-hook*.
+<p>To see the current s7 stack, <code>(stacktrace)</code>.
 To evaluate the error handler in the environment of the error:
 </p>
 
@@ -4652,7 +4651,7 @@ To evaluate the error handler in the environment of the error:
 
 
 <p>The hook <em class=def id="errorhook">*error-hook*</em> provides a way to specialize error reporting.
-Its arguments are named 'type and 'data.
+Its arguments are named 'type and 'data.  It is called if there are no catches.
 </p>
 
 <pre class="indented">
@@ -8840,8 +8839,6 @@ s7_set_current_error_port(s7, old_port);
 </pre>
 <p>and if errmsg is not NULL, it posts it somewhere.
 (You'll also want to GC-protect the old port while it is idle).
-If you don't want catch or s7's error messages, you can go down
-a level via *error-hook*.
 </p>
 <p>s7_error does not return; its s7_pointer return type is just a convenience.  It unwinds the
 scheme stack, closing files, handling dynamic-winds, looking for a catch that matches its type argument
@@ -9101,6 +9098,7 @@ to the arguments.
 void s7_define(s7_scheme *sc, s7_pointer env, s7_pointer symbol, s7_pointer value);
 bool s7_is_defined(s7_scheme *sc, const char *name);
 
+/* these s7_define* functions return a symbol */
 s7_pointer s7_define_variable(s7_scheme *sc, const char *name, s7_pointer value);
 s7_pointer s7_define_variable_with_documentation(s7_scheme *sc, const char *name, s7_pointer value, const char *help);
 
@@ -9132,6 +9130,7 @@ void s7_define_typed_function_star(s7_scheme *sc, const char *name, s7_function 
 s7_pointer s7_define_macro(s7_scheme *sc, const char *name, s7_function fnc, 
                            s7_int required_args, s7_int optional_args, bool rest_arg, const char *doc);
 
+/* s7_make* functions return a function */
 s7_pointer s7_make_function(s7_scheme *sc, const char *name, s7_function fnc, 
                             s7_int required_args, s7_int optional_args, bool rest_arg, const char *doc);
 s7_pointer s7_make_safe_function(s7_scheme *sc, const char *name, s7_function fnc, 
@@ -9192,16 +9191,19 @@ s7_define_variable(s7, "var", s7_make_integer(s7, 123)); /* (define var 123) */
 <pre class="indented">
 s7_define_constant(sc, "var", s7_f(sc));  /* (define-constant var 123) */
 </pre>
+<p>Most of the s7_define* functions return the name as a symbol; this reflects the way
+define worked in s7 until 2014.  Backwards compatibility...
+</p>
 
 <p>The rest of the functions in this section deal with tieing C functions into Scheme.
-s7_make_function creates a Scheme function object from the s7_function 'fnc'.
+s7_make_function creates (and returns) a Scheme function object from the s7_function 'fnc'.
 An s7_function is a C function of the form <code>s7_pointer func(s7_scheme *sc, s7_pointer args)</code>.
 The new function's name is 'name', it requires 'required_args' arguments,
 it can accept 'optional_args' other arguments, and if 'rest_arg' is true, it accepts
 a "rest" argument (a list of all the trailing arguments).  
 The function's documentation is 'doc'.
 </p>
-<p>s7_define_function is the same as s7_make_function, but it also adds 'name' (as a symbol) to the
+<p>Leaving aside the value returned, s7_define_function is the same as s7_make_function, but it also adds 'name' (as a symbol) to the
 global environment, with the function as its value.  For example, the Scheme
 function 'car' is essentially:
 </p>
@@ -9216,7 +9218,7 @@ s7_define_function(sc, "car", g_car, 1, 0, false, "(car obj)");
 <p>which says that car has one required argument, no optional arguments, and no "rest" argument.
 </p>
 <p>s7_define_macro defines a Scheme macro; its arguments are not evaluated (unlike a function),
-but its returned value (assumed to be some sort of Scheme expression) is evaluated.
+but its returned value (assumed to be some sort of Scheme expression) is evaluated.  It returns a symbol.
 </p>
 <p>The "safe" and "unsafe" versions of these functions refer to the s7 optimizer.
 If it knows a function is safe, it can more thoroughly optimize the expression it is in.
