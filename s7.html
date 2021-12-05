@@ -112,7 +112,7 @@
 
 
 <p>s7 is a Scheme implementation intended as an extension language
-for other applications, primarily Snd, Radium, Common Music, and Max/MSP through the Scheme For Max external.
+for other applications, primarily Snd, Radium, Common Music, and Max/MSP through Scheme For Max (or Pd).
 It exists as just two files, s7.c and
 s7.h, that want only to disappear into someone else's source tree.  There are no libraries,
 no run-time init files, and no configuration scripts.
@@ -5536,7 +5536,7 @@ openlets                      #t, whether any let can be open globally (this ove
 expansions?                   #t, whether expansions are handled at read-time
 muffle-warnings?              #f, if #t s7_warn does not output anything
 
-cpu-time                      run time so far
+cpu-time                      run time so far (proportional to cpu cycles consumed, not wall-clock seconds)
 file-names                    currently loaded files (a list)
 catches                       a list of the currently active catch tags
 c-types                       a list of c-object type names (from s7_make_c_type, etc)
